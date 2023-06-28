@@ -41,6 +41,7 @@ class PertBio:
         self.monitor_x, self.monitor_y = self.iter_monitor.get_next()
         self.eval_x, self.eval_y = self.iter_eval.get_next()
         self.l1_lambda, self.l2_lambda = self.args.l1_lambda_placeholder, self.args.l2_lambda_placeholder
+        self.train_y0, self.monitor_y0, self.eval_y0 = None, None, None
         self.lr = self.args.lr
 
     def get_ops(self):
@@ -96,6 +97,8 @@ class CellBox(PertBio):
             self.monitor_y0 = tf.transpose(self.monitor_x)
             self.eval_y0 = tf.transpose(self.eval_x)
             self.gradient_zero_from = self.args.n_activity_nodes
+
+        # ODE-specific params
         self.envelope_fn = cellbox.kernel.get_envelope(self.args)
         self.ode_solver = cellbox.kernel.get_ode_solver(self.args)
         self._dxdt = cellbox.kernel.get_dxdt(self.args, self.params)

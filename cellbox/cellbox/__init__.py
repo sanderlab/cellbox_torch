@@ -6,8 +6,10 @@ from cellbox.model import *
 from cellbox.kernel import *
 from cellbox.dataset import *
 from cellbox.dataset_torch import *
+from cellbox.model_torch import *
 from cellbox.train import *
 from cellbox.utils import *
+from cellbox.kernel_torch import *
 from cellbox.version import __version__, VERSION, get_msg
 
 get_msg()

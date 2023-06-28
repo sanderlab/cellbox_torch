@@ -21,14 +21,14 @@ def loss(x_gold, x_hat, W, l1=0, l2=0, weight=1.):
     """
     #if isinstance(x_gold, tf.SparseTensor):
     #    x_gold = tf.sparse.to_dense(x_gold)
-    loss_mse = torch.mean(torch.square(x_gold - x_hat)*torch.abs(weight))
+    loss_mse = torch.mean(torch.square(x_gold - x_hat)*abs(weight))
     l1_loss = l1 * torch.sum(torch.abs(W))
     l2_loss = l2 * torch.sum(torch.square(torch.abs(W)))
     loss_full = loss_mse + l1_loss + l2_loss
     return loss_full, loss_mse
 
 
-def optimize(loss_in, lr, optimizer=torch.optim.Adam, var_list=None):
+def optimize(var_list, lr, optimizer=torch.optim.Adam):
     """
     Optimize the training loss using Adam
     Do we need this at all for Pytorch?
@@ -47,7 +47,9 @@ def optimize(loss_in, lr, optimizer=torch.optim.Adam, var_list=None):
     #    opt = optimizer(lr)
     #    opt_op = opt.minimize(loss_in, var_list=var_list)
     #return opt_op
-    pass
+    return optimizer(
+        params=var_list, lr=lr
+    )
 
 
 class TimeLogger:
