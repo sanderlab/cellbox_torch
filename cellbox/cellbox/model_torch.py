@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import cellbox.kernel
+import cellbox.kernel_torch
 
 from cellbox.utils_torch import loss, optimize
 
@@ -96,9 +96,6 @@ class CellBox(PertBio):
         """
         Get the nn Parameters
         """
-        self.envelope_fn = cellbox.kernel.get_envelope(self.args)
-        self.ode_solver = cellbox.kernel.get_ode_solver(self.args)
-        self._dxdt = cellbox.kernel.get_dxdt(self.args, self.params)
         n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
         self.params = nn.ParameterDict()
 
@@ -108,7 +105,8 @@ class CellBox(PertBio):
         W_mask[:, n_protein_nodes:n_activity_nodes] = np.zeros([n_x, n_activity_nodes - n_protein_nodes])
         W_mask[n_protein_nodes:n_activity_nodes, n_activity_nodes:] = np.zeros([n_activity_nodes - n_protein_nodes,
                                                                                 n_x - n_activity_nodes])
-        self.params['W'] = torch.from_numpy(W_mask) * W
+        final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
+        self.params['W'] = nn.Parameter(final_W)
 
         eps = nn.Parameter(torch.ones((n_x, 1)))
         alpha = nn.Parameter(torch.ones((n_x, 1)))
@@ -118,6 +116,22 @@ class CellBox(PertBio):
         if self.args.envelope == 2:
             psi = nn.Parameter(torch.ones((n_x, 1)))
             self.params['psi'] = torch.nn.functional.softplus(psi)
+
+        if self.args.pert_form == 'by u':
+            #y0 = tf.constant(np.zeros((self.n_x, 1)), name="x_init", dtype=tf.float32)
+            #self.train_y0 = y0
+            #self.monitor_y0 = y0
+            #self.eval_y0 = y0
+            self.gradient_zero_from = None
+        elif self.args.pert_form == 'fix x':  # fix level of node x (here y) by input perturbation u (here x)
+            #self.train_y0 = tf.transpose(self.train_x)
+            #self.monitor_y0 = tf.transpose(self.monitor_x)
+            #self.eval_y0 = tf.transpose(self.eval_x)
+            self.gradient_zero_from = self.args.n_activity_nodes
+
+        self.envelope_fn = cellbox.kernel_torch.get_envelope(self.args)
+        self.ode_solver = cellbox.kernel_torch.get_ode_solver(self.args)
+        self._dxdt = cellbox.kernel_torch.get_dxdt(self.args, self.params)
 
     def get_variables(self):
         """
@@ -176,5 +190,5 @@ def get_ops(args, model):
         model.parameters(),
         lr=args.lr
     )
-    args.device = torch.device("cuda")
+    args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     return args

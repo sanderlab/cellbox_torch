@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import pandas as pd
 import torch
 import torch.nn as nn
 import time
@@ -20,13 +22,9 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
         n_iter (int): maximum number of iterations
         n_iter_buffer (int): training loss moving average window
         n_iter_patience (int): training loss tolerance
-        args: Args or configs:
-            args.loss_fn: the loss function used for training the model
-            args.optimizer (torch.optim): the torch optimizer
-            args.device: the device to put the torch tensors to
+        args: Args or configs
     """
 
-    # Let's just assume that args contains also the loss function, dataloaders, and the optimizer
     stages = glob.glob("*best*.csv")
     try:
         substage_i = 1 + max([int(stage[0]) for stage in stages])
@@ -37,15 +35,8 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
 
     n_unchanged = 0
     idx_iter = 0
-    #for key in args.feed_dicts:
-    #    args.feed_dicts[key].update({
-    #        model.lr: lr_val,
-    #        model.l1_lambda: l1_lambda,
-    #        model.l2_lambda: l2_lambda
-    #    })
     args.logger.log("--------- lr: {}\tl1: {}\tl2: {}\t".format(lr_val, l1_lambda, l2_lambda))
 
-    #sess.run(model.iter_monitor.initializer, feed_dict=args.feed_dicts['valid_set'])
     for idx_epoch in range(n_epoch):
 
         if idx_iter > n_iter or n_unchanged > n_iter_patience:
@@ -53,26 +44,42 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
 
         for i, train_minibatch in enumerate(args.iter_train):
             # Each train_minibatch has shape of (batch_size, num_features)
-            x_train, y_train = train_minibatch.to(args.device)
+            x_train, y_train = train_minibatch
 
             if idx_iter > n_iter or n_unchanged > n_iter_patience:
                 break
 
             # Do one forward pass
             t0 = time.perf_counter()
+            model.train()
             args.optimizer.zero_grad()
-            prediction = model(None, x_train.to(args.device))
-            loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), prediction, model.W.weight)
+            if args.pert_form == "by u":
+                prediction = model(torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), x_train.to(args.device))
+            elif args.pert_form == "fix x":
+                prediction = model(x_train.T.to(args.device), x_train.to(args.device))
+            convergence_metric, yhat = prediction
+            loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, model.state_dict()["params.W"])
             loss_train_i.backward()
             args.optimizer.step()
 
-            # Record validation results
+            # Record training
             with torch.no_grad():
-                # Very questionable for validation
-                loss_valid, loss_valid_mse = 0, 0
+                model.eval()
                 valid_minibatch = iter(args.iter_monitor)
                 x_valid, y_valid = next(valid_minibatch)
-                loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), model(None, x_valid.to(args.device)), model.W.weight)
+                if args.pert_form == "by u":
+                    prediction = model(
+                        torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
+                        x_valid.to(args.device)
+                    )
+                elif args.pert_form == "fix x":
+                    prediction = model(
+                        x_valid.T.to(args.device),
+                        x_valid.to(args.device)
+                    )
+                    
+                convergence_metric, yhat = prediction
+                loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, model.state_dict()["params.W"])
 
             # Record results to screenshot
             new_loss = best_params.avg_n_iters_loss(loss_valid_i)
@@ -84,34 +91,44 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                                                                               n_iter_patience))
             
             append_record("record_eval.csv",
-                          [idx_epoch, idx_iter, loss_train_i, loss_valid_i, loss_train_mse_i,
-                           loss_valid_mse_i, None, time.perf_counter() - t0])
+                          [idx_epoch, idx_iter, loss_train_i.item(), loss_valid_i.item(), loss_train_mse_i.item(),
+                           loss_valid_mse_i.item(), None, time.perf_counter() - t0])
 
             # Early stopping
             idx_iter += 1
             if new_loss < best_params.loss_min:
                 n_unchanged = 0
-
+                best_params.screenshot(model, substage_i, args=args,
+                                       node_index=args.dataset['node_index'], loss_min=new_loss)
             else:
                 n_unchanged += 1
 
+        for k, v in best_params.items():
+            assert type(v) == pd.DataFrame, print(k)
+
     # Evaluation on valid set
     t0 = time.perf_counter()
-    #sess.run(model.iter_eval.initializer, feed_dict=args.feed_dicts['valid_set'])
-    #loss_valid_i, loss_valid_mse_i = eval_model(sess, model.iter_eval, (model.eval_loss, model.eval_mse_loss),
-    #                                            args.feed_dicts['valid_set'], n_batches_eval=args.n_batches_eval)
-    #append_record("record_eval.csv", [-1, None, None, loss_valid_i, None, loss_valid_mse_i, None, time.perf_counter() - t0])
-#
-    ## Evaluation on test set
-    #t0 = time.perf_counter()
-    #sess.run(model.iter_eval.initializer, feed_dict=args.feed_dicts['test_set'])
-    #loss_test_mse = eval_model(sess, model.iter_eval, model.eval_mse_loss,
-    #                           args.feed_dicts['test_set'], n_batches_eval=args.n_batches_eval)
-    #append_record("record_eval.csv", [-1, None, None, None, None, None, loss_test_mse, time.perf_counter() - t0])
+    loss_valid_i = eval_model(
+        args, args.iter_monitor, model, return_value="loss_full", n_batches_eval=args.n_batches_eval
+    )
+    loss_valid_mse_i = eval_model(
+        args, args.iter_monitor, model, return_value="loss_mse", n_batches_eval=args.n_batches_eval
+    )
+    append_record("record_eval.csv", [-1, None, None, loss_valid_i, None, loss_valid_mse_i, None, time.perf_counter() - t0])
 
+    # Evaluation on test set
+    t0 = time.perf_counter()
+    loss_test_mse = eval_model(
+        args, args.iter_eval, model, return_value="loss_mse", n_batches_eval=args.n_batches_eval
+    )
+    append_record("record_eval.csv", [-1, None, None, None, None, None, loss_test_mse, time.perf_counter() - t0])
+
+    # Save results
     best_params.save()
     args.logger.log("------------------ Substage {} finished!-------------------".format(substage_i))
-    #save_model(args.saver, sess, './' + args.ckpt_name)
+    save_model(model, f"./{args.ckpt_name}")
+
+    return best_params
 
 
 def append_record(filename, contents):
@@ -122,16 +139,33 @@ def append_record(filename, contents):
         f.write('\n')
 
 
-def eval_model(device, eval_iter, model, obj_fn, return_avg=True, n_batches_eval=None):
+def eval_model(args, eval_iter, model, return_value, return_avg=True, n_batches_eval=None):
     """ Simulate the model for prediction """
 
-    with torch.no_grad()
+    with torch.no_grad():
+        counter = 0
         eval_results = []
         for item in eval_iter:
             pert, expr = item
-            pred = model(pert.to(device))
-            loss = obj_fn(pred, expr.to(device))
-            eval_results.append(loss.item())
+            if args.pert_form == "by u":
+                prediction = model(
+                    torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
+                    pert.to(args.device)
+                )
+            elif args.pert_form == "fix x":
+                prediction = model(
+                    pert.T.to(args.device), 
+                    pert.to(args.device)
+                )
+            _, yhat = prediction
+            if return_value == "prediction":
+                eval_results.append(yhat.detach().cpu().numpy())
+            elif return_value == "loss_full":
+                loss_full, _ = args.loss_fn(expr.to(args.device), yhat, model.state_dict()["params.W"])
+                eval_results.append(loss_full.detach().cpu().numpy())
+            elif return_value == "loss_mse":
+                _, loss_mse = args.loss_fn(expr.to(args.device), yhat, model.state_dict()["params.W"])
+                eval_results.append(loss_mse.detach().cpu().numpy())
             counter += 1
             if n_batches_eval is not None and counter > n_batches_eval:
                 break
@@ -139,19 +173,17 @@ def eval_model(device, eval_iter, model, obj_fn, return_avg=True, n_batches_eval
         if return_avg:
             return np.mean(np.array(eval_results), axis=0)
         return np.vstack(eval_results)
+    
+
+def save_model(model, save_dir):
+    """ Save the model """
+    torch.save(model.state_dict(), save_dir)
 
 
 def train_model(model, args):
     """Train the model"""
     args.logger = TimeLogger(time_logger_step=1, hierachy=2)
-
-    # Check if all variables in scope
-    # TODO: put variables under appropriate scopes
-    #try:
-    #    args.saver.restore(sess, './' + args.ckpt_name)
-    #    print('Load existing model at {}...'.format(args.ckpt_name))
-    #except Exception:
-    #    print('Create new model at {}...'.format(args.ckpt_name))
+    model = model[0].to(args.device)
 
     # Training
     for substage in args.sub_stages:
@@ -179,6 +211,7 @@ class Screenshot(dict):
         self.summary = {}
         self.substage_i = []
         self.export_verbose = args.export_verbose
+        self.args = args
 
     def avg_n_iters_loss(self, new_loss):
         """average the last few losses"""
@@ -186,46 +219,99 @@ class Screenshot(dict):
         self.saved_losses = self.saved_losses[-self.n_iter_buffer:]
         return sum(self.saved_losses) / len(self.saved_losses)
 
-    def screenshot(self, sess, model, substage_i, node_index, loss_min, args):
+    def screenshot(self, model, substage_i, node_index, loss_min, args):
         """evaluate models"""
         self.substage_i = substage_i
         self.loss_min = loss_min
 
         # Save the variable weights associated with each of the conditions in a csv file
         if self.export_verbose > 0:
-            params = sess.run(model.params)
+            #layer = model.W
+            params = model.state_dict()
+            new_params = {}
             for item in params:
                 try:
-                    params[item] = pd.DataFrame(params[item], index=node_index[0])
+                    new_params[item] = pd.DataFrame(params[item].detach().numpy(), index=node_index[0])
                 except Exception:
-                    params[item] = pd.DataFrame(params[item])
-            self.update(params)
+                    new_params[item] = pd.DataFrame(params[item].detach().numpy())
+            self.update(new_params)
 
         if self.export_verbose > 1 or self.export_verbose == -1:  # no params but y_hat
-            sess.run(model.iter_eval.initializer, feed_dict=model.args.feed_dicts['test_set'])
-            y_hat = eval_model(sess, model.iter_eval, model.eval_yhat, args.feed_dicts['test_set'], return_avg=False)
+            y_hat = eval_model(args, args.iter_eval, model, return_value="prediction", return_avg=False)
             y_hat = pd.DataFrame(y_hat, columns=node_index[0])
             self.update({'y_hat': y_hat})
 
         if self.export_verbose > 2:
             try:
-                # TODO: not yet support data iterators
-                summary_train = sess.run(model.convergence_metric,
-                                         feed_dict={model.in_pert: args.dataset['pert_train']})
-                summary_test = sess.run(model.convergence_metric, feed_dict={model.in_pert: args.dataset['pert_test']})
-                summary_valid = sess.run(model.convergence_metric,
-                                         feed_dict={model.in_pert: args.dataset['pert_valid']})
-                summary_train = pd.DataFrame(summary_train, columns=[node_index.values + '_mean', node_index.values +
-                                                                     '_sd', node_index.values + '_dxdt'])
-                summary_test = pd.DataFrame(summary_test, columns=[node_index.values + '_mean', node_index.values +
-                                                                   '_sd', node_index.values + '_dxdt'])
-                summary_valid = pd.DataFrame(summary_valid, columns=[node_index.values + '_mean', node_index.values +
-                                                                     '_sd', node_index.values + '_dxdt'])
+                # Run summary on train set
+                converge_train_mat, converge_eval_mat, converge_test_mat = [], [], []
+                for item in args.iter_train:
+                    pert, _ = item
+                    if args.pert_form == "by u":
+                        prediction = model(
+                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
+                            pert.to(args.device)
+                        )
+                    elif args.pert_form == "fix x":
+                        prediction = model(
+                            pert.T.to(args.device), 
+                            pert.to(args.device)
+                        )
+                    # Shape (length, batch_size)
+                    convergence_metric_train, _ = prediction
+                    converge_train_mat.append(convergence_metric_train.detach().numpy())
+
+                # Run summary on eval set
+                for item in args.iter_monitor:
+                    pert, _ = item
+                    if args.pert_form == "by u":
+                        prediction = model(
+                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
+                            pert.to(args.device)
+                        )
+                    elif args.pert_form == "fix x":
+                        prediction = model(
+                            pert.T.to(args.device), 
+                            pert.to(args.device)
+                        )
+                    # Shape (length, batch_size)
+                    convergence_metric_eval, _ = prediction
+                    converge_eval_mat.append(convergence_metric_eval.detach().numpy())
+                
+                # Run summary on test set
+                for item in args.iter_eval:
+                    pert, _ = item
+                    if args.pert_form == "by u":
+                        prediction = model(
+                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
+                            pert.to(args.device)
+                        )
+                    elif args.pert_form == "fix x":
+                        prediction = model(
+                            pert.T.to(args.device), 
+                            pert.to(args.device)
+                        )
+                    # Shape (length, batch_size)
+                    convergence_metric_test, _ = prediction
+                    converge_test_mat.append(convergence_metric_test.detach().numpy())
+
+                # Concatenate the results:
+                converge_train_mat = np.concatenate(converge_train_mat, axis=1)
+                converge_test_mat = np.concatenate(converge_test_mat, axis=1)
+                converge_eval_mat = np.concatenate(converge_eval_mat, axis=1)
+                
+                # Summarize performance
+                cols = [node_index.values + '_mean', node_index.values + '_sd', node_index.values + '_dxdt']
+                cols = np.squeeze(np.concatenate(cols)).tolist()
+                summary_train = pd.DataFrame(converge_train_mat.T, columns=cols)
+                summary_test = pd.DataFrame(converge_test_mat.T, columns=cols)
+                summary_valid = pd.DataFrame(converge_eval_mat.T, columns=cols)
                 self.update(
                     {'summary_train': summary_train, 'summary_test': summary_test, 'summary_valid': summary_valid}
                 )
-            except Exception:
-                pass
+
+            except Exception as e:
+                print(e)
 
     def save(self):
         """save model parameters"""
@@ -233,3 +319,4 @@ class Screenshot(dict):
             os.remove(file)
         for key in self:
             self[key].to_csv("{}_best.{}.loss.{}.csv".format(self.substage_i, key, self.loss_min))
+        
