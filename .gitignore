@@ -106,6 +106,7 @@ venv.bak/
 
 # results
 results/
+manuscript_rep/
 configs/*/grid_search
 configs_dev/
 bash_scripts/
