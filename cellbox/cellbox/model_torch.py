@@ -106,15 +106,15 @@ class CellBox(PertBio):
         W_mask[n_protein_nodes:n_activity_nodes, n_activity_nodes:] = np.zeros([n_activity_nodes - n_protein_nodes,
                                                                                 n_x - n_activity_nodes])
         final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
-        self.params['W'] = nn.Parameter(final_W)
+        self.params['W'] = nn.Parameter(final_W, requires_grad=True)
 
-        eps = nn.Parameter(torch.ones((n_x, 1)))
-        alpha = nn.Parameter(torch.ones((n_x, 1)))
+        eps = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
+        alpha = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
         self.params['alpha'] = nn.functional.softplus(alpha)
         self.params['eps'] = nn.functional.softplus(eps)
 
         if self.args.envelope == 2:
-            psi = nn.Parameter(torch.ones((n_x, 1)))
+            psi = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
             self.params['psi'] = torch.nn.functional.softplus(psi)
 
         if self.args.pert_form == 'by u':

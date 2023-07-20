@@ -1,5 +1,5 @@
 {
-  "experiment_id": "Example_RP",
+  "experiment_id": "Pytorch_RP_fig2_rep",
   "experiment_type": "random partition",
   "model": "CellBox",
   "sparse_data": false,

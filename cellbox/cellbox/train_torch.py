@@ -6,6 +6,7 @@ import torch.nn as nn
 import time
 import glob
 from cellbox.utils import TimeLogger
+from cellbox.utils_torch import optimize
 
 def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_buffer, n_iter_patience, args):
     """
@@ -36,10 +37,21 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
     n_unchanged = 0
     idx_iter = 0
     args.logger.log("--------- lr: {}\tl1: {}\tl2: {}\t".format(lr_val, l1_lambda, l2_lambda))
+    args.l1_lambda = l1_lambda
+    args.l2_lambda = l2_lambda
+    args.lr = lr_val
+    args.optimizer = optimize(
+        model.parameters(),
+        lr=args.lr
+    )
 
     for idx_epoch in range(n_epoch):
 
         if idx_iter > n_iter or n_unchanged > n_iter_patience:
+            if idx_iter > n_iter: 
+                args.logger.log("Ended substage due to iteration exceeding maximum value")
+            if n_unchanged > n_iter_patience:
+                args.logger.log("Ended substage due to loss not improving exceeding maximum number of iterations")
             break
 
         for i, train_minibatch in enumerate(args.iter_train):
@@ -58,7 +70,12 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
             elif args.pert_form == "fix x":
                 prediction = model(x_train.T.to(args.device), x_train.to(args.device))
             convergence_metric, yhat = prediction
-            loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, model.state_dict()["params.W"])
+
+            for param in model.named_parameters():
+                if param[0] == "params.W":
+                    param_mat = param[1]
+                    break
+            loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_train.to(args.device))
             loss_train_i.backward()
             args.optimizer.step()
 
@@ -79,16 +96,25 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                     )
                     
                 convergence_metric, yhat = prediction
-                loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, model.state_dict()["params.W"])
+                for param in model.named_parameters():
+                    if param[0] == "params.W":
+                        param_mat = param[1]
+                        break
+                loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_valid.to(args.device))
 
             # Record results to screenshot
             new_loss = best_params.avg_n_iters_loss(loss_valid_i)
             if args.export_verbose > 0:
-                print(("Substage:{}\tEpoch:{}/{}\tIteration: {}/{}" + "\tloss (train):{:1.6f}\tloss (buffer on valid):"
-                       "{:1.6f}" + "\tbest:{:1.6f}\tTolerance: {}/{}").format(substage_i, idx_epoch, n_epoch, idx_iter,
-                                                                              n_iter, loss_train_i, new_loss,
-                                                                              best_params.loss_min, n_unchanged,
-                                                                              n_iter_patience))
+                print(
+                    f"Substage:{substage_i}\tEpoch:{idx_epoch}/{n_epoch}\tIteration: {idx_iter}/{n_iter}" +
+                    f"\tloss (train):{loss_train_i:1.6f}\tloss (buffer on valid):{new_loss:1.6f}" +
+                    f"\tbest:{best_params.loss_min:1.6f}\tTolerance: {n_unchanged}/{n_iter_patience}"
+                    )
+                #print(("Substage:{}\tEpoch:{}/{}\tIteration: {}/{}" + "\tloss (train):{:1.6f}\tloss (buffer on valid):"
+                #       "{:1.6f}" + "\tbest:{:1.6f}\tTolerance: {}/{}").format(substage_i, idx_epoch, n_epoch, idx_iter,
+                #                                                              n_iter, loss_train_i, new_loss,
+                #                                                              best_params.loss_min, n_unchanged,
+                #                                                              n_iter_patience))
             
             append_record("record_eval.csv",
                           [idx_epoch, idx_iter, loss_train_i.item(), loss_valid_i.item(), loss_train_mse_i.item(),
@@ -158,13 +184,17 @@ def eval_model(args, eval_iter, model, return_value, return_avg=True, n_batches_
                     pert.to(args.device)
                 )
             _, yhat = prediction
+            for param in model.named_parameters():
+                if param[0] == "params.W":
+                    param_mat = param[1]
+                    break
             if return_value == "prediction":
                 eval_results.append(yhat.detach().cpu().numpy())
             elif return_value == "loss_full":
-                loss_full, _ = args.loss_fn(expr.to(args.device), yhat, model.state_dict()["params.W"])
+                loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
                 eval_results.append(loss_full.detach().cpu().numpy())
             elif return_value == "loss_mse":
-                _, loss_mse = args.loss_fn(expr.to(args.device), yhat, model.state_dict()["params.W"])
+                _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
                 eval_results.append(loss_mse.detach().cpu().numpy())
             counter += 1
             if n_batches_eval is not None and counter > n_batches_eval:
@@ -184,6 +214,12 @@ def train_model(model, args):
     """Train the model"""
     args.logger = TimeLogger(time_logger_step=1, hierachy=2)
     model = model[0].to(args.device)
+
+    try:
+        print(f'Load existing model at ./{args.ckpt_name}...')
+        model.load_state_dict(torch.load(f"./{args.ckpt_name}"))
+    except Exception:
+        print(f'Create new model at ./{args.ckpt_name}...')
 
     # Training
     for substage in args.sub_stages:
