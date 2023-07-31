@@ -99,22 +99,23 @@ class CellBox(PertBio):
         n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
         self.params = nn.ParameterDict()
 
-        W = nn.Parameter(torch.normal(mean=0.01, std=1.0, size=(n_x, n_x)))
+        W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x))
+        #with open("/users/ngun7t/Documents/cellbox-jun-6/init_weights.npy", "rb") as f: W = torch.tensor(np.load(f), dtype=torch.float32)
+        W = nn.Parameter(W, requires_grad=True)
+
         W_mask = (1.0 - np.diag(np.ones([n_x])))
         W_mask[n_activity_nodes:, :] = np.zeros([n_x - n_activity_nodes, n_x])
         W_mask[:, n_protein_nodes:n_activity_nodes] = np.zeros([n_x, n_activity_nodes - n_protein_nodes])
         W_mask[n_protein_nodes:n_activity_nodes, n_activity_nodes:] = np.zeros([n_activity_nodes - n_protein_nodes,
                                                                                 n_x - n_activity_nodes])
-        final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
-        self.params['W'] = nn.Parameter(final_W, requires_grad=True)
-
-        eps = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
-        alpha = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
+        self.params['W'] = (torch.from_numpy(W_mask)*W).type(torch.float32)
+        eps = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
+        alpha = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
         self.params['alpha'] = nn.functional.softplus(alpha)
         self.params['eps'] = nn.functional.softplus(eps)
 
         if self.args.envelope == 2:
-            psi = nn.Parameter(torch.ones((n_x, 1)), requires_grad=True)
+            psi = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
             self.params['psi'] = torch.nn.functional.softplus(psi)
 
         if self.args.pert_form == 'by u':
@@ -133,28 +134,17 @@ class CellBox(PertBio):
         self.ode_solver = cellbox.kernel_torch.get_ode_solver(self.args)
         self._dxdt = cellbox.kernel_torch.get_dxdt(self.args, self.params)
 
-    def get_variables(self):
+    def mask(self):
         """
-        Initialize parameters in the Hopfield equation
-
-        Mutates:
-            self.params(dict):{
-                W (tf.Variable): interaction matrix with constraints enforced, , shape: [n_x, n_x]
-                alpha (tf.Variable): alpha, shape: [n_x, 1]
-                eps (tf.Variable): eps, shape: [n_x, 1]
-            }
+        Mask the weight matrices
         """
-        
-        """
-            Enforce constraints  (i: recipient)
-            no self regulation wii=0
-            ingoing wij for drug nodes (88th to 99th) = 0 [n_activity_nodes 87: ]
-                            w [87:99,_] = 0
-            outgoing wij for phenotypic nodes (83th to 87th) [n_protein_nodes 82 : n_activity_nodes 87]
-                            w [_, 82:87] = 0
-            ingoing wij for phenotypic nodes from drug ndoes (direct) [n_protein_nodes 82 : n_activity_nodes 87]
-                            w [82:87, 87:99] = 0
-        """
+        W_mask = (1.0 - np.diag(np.ones([self.n_x])))
+        W_mask[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
+        W_mask[:, self.args.n_protein_nodes:self.args.n_activity_nodes] = np.zeros([self.n_x, self.args.n_activity_nodes - self.args.n_protein_nodes])
+        W_mask[self.args.n_protein_nodes:self.args.n_activity_nodes, self.args.n_activity_nodes:] = np.zeros([self.args.n_activity_nodes - self.args.n_protein_nodes,
+                                                                                self.n_x - self.args.n_activity_nodes])
+        #final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
+        self.params['W'] = (torch.from_numpy(W_mask)*self.params['W']).type(torch.float32)
 
     def forward(self, y0, mu):
         mu_t = torch.transpose(mu, 0, 1)
@@ -162,6 +152,7 @@ class CellBox(PertBio):
         # [n_T, n_x, batch_size]
         ys = ys[-self.args.ode_last_steps:]
         # [n_iter_tail, n_x, batch_size]
+        self.mask()
         mean = torch.mean(ys, dim=0)
         sd = torch.std(ys, dim=0)
         yhat = torch.transpose(ys[-1], 0, 1)

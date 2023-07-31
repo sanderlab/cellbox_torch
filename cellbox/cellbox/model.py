@@ -147,7 +147,8 @@ class CellBox(PertBio):
                ingoing wij for phenotypic nodes from drug ndoes (direct) [n_protein_nodes 82 : n_activity_nodes 87]
                                 w [82:87, 87:99] = 0
             """
-            W = tf.Variable(np.random.normal(0.01, size=(n_x, n_x)), name="W", dtype=tf.float32)
+            #W = tf.Variable(np.random.normal(0.01, size=(n_x, n_x)), name="W", dtype=tf.float32)
+            with open("/users/ngun7t/Documents/cellbox-jun-6/init_weights.npy", "rb") as f: W = tf.Variable(np.load(f), name="W", dtype=tf.float32)
             W_mask = (1.0 - np.diag(np.ones([n_x])))
             W_mask[n_activity_nodes:, :] = np.zeros([n_x - n_activity_nodes, n_x])
             W_mask[:, n_protein_nodes:n_activity_nodes] = np.zeros([n_x, n_activity_nodes - n_protein_nodes])

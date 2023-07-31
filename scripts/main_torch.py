@@ -10,8 +10,6 @@ import shutil
 import argparse
 import json
 
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
 
 parser = argparse.ArgumentParser(description='CellBox main script')
 parser.add_argument('-config', '--experiment_config_path', required=True, type=str, help="Path of experiment config")

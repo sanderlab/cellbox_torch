@@ -20,7 +20,7 @@ def get_envelope(args):
     elif args.envelope_form == 'hill':
         k = args.polynomial_k
         assert k > 1, "Hill coefficient has to be k>=2."
-        args.envelope_fn = lambda x: 2*(1-1/(1+nn.ReLU(x+1)**k))-1
+        args.envelope_fn = lambda x: 2*(1-1/(1+nn.functional.relu(torch.tensor(x+1)).numpy()**k))-1
     elif args.envelope_form == 'linear':
         args.envelope_fn = lambda x: x
     elif args.envelope_form == 'clip linear':

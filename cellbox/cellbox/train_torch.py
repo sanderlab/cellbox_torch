@@ -75,7 +75,10 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                 if param[0] == "params.W":
                     param_mat = param[1]
                     break
-            loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_train.to(args.device))
+            if args.weight_loss == "expr":
+                loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_train.to(args.device))
+            else:
+                loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda)
             loss_train_i.backward()
             args.optimizer.step()
 
@@ -100,10 +103,14 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                     if param[0] == "params.W":
                         param_mat = param[1]
                         break
-                loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_valid.to(args.device))
+
+                if args.weight_loss == "expr":
+                    loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_valid.to(args.device))
+                else:
+                    loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda)
 
             # Record results to screenshot
-            new_loss = best_params.avg_n_iters_loss(loss_valid_i)
+            new_loss = best_params.avg_n_iters_loss(loss_valid_i.item())
             if args.export_verbose > 0:
                 print(
                     f"Substage:{substage_i}\tEpoch:{idx_epoch}/{n_epoch}\tIteration: {idx_iter}/{n_iter}" +
@@ -191,10 +198,16 @@ def eval_model(args, eval_iter, model, return_value, return_avg=True, n_batches_
             if return_value == "prediction":
                 eval_results.append(yhat.detach().cpu().numpy())
             elif return_value == "loss_full":
-                loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
+                if args.weight_loss == "expr":
+                    loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
+                else:
+                    loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda)
                 eval_results.append(loss_full.detach().cpu().numpy())
             elif return_value == "loss_mse":
-                _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
+                if args.weight_loss == "expr":
+                    _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
+                else:
+                    _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda)
                 eval_results.append(loss_mse.detach().cpu().numpy())
             counter += 1
             if n_batches_eval is not None and counter > n_batches_eval:

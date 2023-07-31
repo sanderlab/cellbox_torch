@@ -48,7 +48,7 @@ def optimize(var_list, lr, optimizer=torch.optim.Adam):
     #    opt_op = opt.minimize(loss_in, var_list=var_list)
     #return opt_op
     return optimizer(
-        params=var_list, lr=lr
+        params=var_list, lr=lr, eps=1e-07
     )
 
 
