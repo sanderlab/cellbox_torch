@@ -176,6 +176,7 @@ def eval_model(args, eval_iter, model, return_value, return_avg=True, n_batches_
     """ Simulate the model for prediction """
 
     with torch.no_grad():
+        model.eval()
         counter = 0
         eval_results = []
         for item in eval_iter:

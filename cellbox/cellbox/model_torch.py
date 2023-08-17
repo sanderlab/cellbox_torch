@@ -99,16 +99,12 @@ class CellBox(PertBio):
         n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
         self.params = nn.ParameterDict()
 
-        W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x))
+        W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
         #with open("/users/ngun7t/Documents/cellbox-jun-6/init_weights.npy", "rb") as f: W = torch.tensor(np.load(f), dtype=torch.float32)
-        W = nn.Parameter(W, requires_grad=True)
+        #W = nn.Parameter(W, requires_grad=True)
 
-        W_mask = (1.0 - np.diag(np.ones([n_x])))
-        W_mask[n_activity_nodes:, :] = np.zeros([n_x - n_activity_nodes, n_x])
-        W_mask[:, n_protein_nodes:n_activity_nodes] = np.zeros([n_x, n_activity_nodes - n_protein_nodes])
-        W_mask[n_protein_nodes:n_activity_nodes, n_activity_nodes:] = np.zeros([n_activity_nodes - n_protein_nodes,
-                                                                                n_x - n_activity_nodes])
-        self.params['W'] = (torch.from_numpy(W_mask)*W).type(torch.float32)
+        W_mask = self._get_mask()
+        self.params['W'] = nn.Parameter(W_mask*W, requires_grad=True)
         eps = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
         alpha = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
         self.params['alpha'] = nn.functional.softplus(alpha)
@@ -134,9 +130,9 @@ class CellBox(PertBio):
         self.ode_solver = cellbox.kernel_torch.get_ode_solver(self.args)
         self._dxdt = cellbox.kernel_torch.get_dxdt(self.args, self.params)
 
-    def mask(self):
+    def _get_mask(self):
         """
-        Mask the weight matrices
+        Get the mask of the tensors
         """
         W_mask = (1.0 - np.diag(np.ones([self.n_x])))
         W_mask[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
@@ -144,15 +140,17 @@ class CellBox(PertBio):
         W_mask[self.args.n_protein_nodes:self.args.n_activity_nodes, self.args.n_activity_nodes:] = np.zeros([self.args.n_activity_nodes - self.args.n_protein_nodes,
                                                                                 self.n_x - self.args.n_activity_nodes])
         #final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
-        self.params['W'] = (torch.from_numpy(W_mask)*self.params['W']).type(torch.float32)
+        #self.params['W'] = self.params["W"] * (torch.tensor(W_mask, dtype=torch.float32))
+        return torch.tensor(W_mask, dtype=torch.float32)
 
     def forward(self, y0, mu):
         mu_t = torch.transpose(mu, 0, 1)
-        ys = self.ode_solver(y0, mu_t, self.args.dT, self.args.n_T, self._dxdt, self.gradient_zero_from)
+        mask = self._get_mask() #self.mask()
+        ys = self.ode_solver(y0, mu_t, self.args.dT, self.args.n_T, self._dxdt, self.gradient_zero_from, mask=mask)
         # [n_T, n_x, batch_size]
         ys = ys[-self.args.ode_last_steps:]
         # [n_iter_tail, n_x, batch_size]
-        self.mask()
+        #self.mask()
         mean = torch.mean(ys, dim=0)
         sd = torch.std(ys, dim=0)
         yhat = torch.transpose(ys[-1], 0, 1)

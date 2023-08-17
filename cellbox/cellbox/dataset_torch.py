@@ -119,7 +119,7 @@ def get_tensors(cfg):
         val_dataset, batch_size=cfg.batchsize, shuffle=True
     )
     cfg.iter_eval = DataLoader(
-        test_dataset, batch_size=cfg.batchsize, shuffle=True
+        test_dataset, batch_size=cfg.batchsize, shuffle=False
     )
 
     return cfg
