@@ -5,8 +5,42 @@ import torch
 import torch.nn as nn
 import time
 import glob
-from cellbox.utils import TimeLogger
-from cellbox.utils_torch import optimize
+from cellbox.utils_torch import optimize, TimeLogger
+
+def _forward_pass(model, x, y, args):
+    """
+    Perform a forward pass for the model, then also compute the loss function
+    Args:
+        - model: The perturbation model
+        - x: The torch tensor as model input
+        - y: The ground truth output
+        - args: The Config object
+    Returns:
+        - convergence_metric: A torch tensor containing the mean, std, and
+          gradient of the last steps of the ODE solver
+        - yhat: The model prediction given x as input
+        - loss_total: The total loss, including the MSE loss between y and yhat,
+          and the L1 and L2 loss on the model parameters
+        - loss_mse: The MSE loss between y and yhat
+    """
+    if args.pert_form == "by u":
+        prediction = model(torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), x.to(args.device))
+    elif args.pert_form == "fix x":
+        prediction = model(x.T.to(args.device), x.to(args.device))
+    convergence_metric, yhat = prediction
+
+    for param in model.named_parameters():
+        if param[0] == "params.W":
+            param_mat = param[1]
+            break
+
+    if args.weight_loss == "expr":
+        loss_total, loss_mse = args.loss_fn(y.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=y.to(args.device))
+    else:
+        loss_total, loss_mse = args.loss_fn(y.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda)
+
+    return convergence_metric, yhat, loss_total, loss_mse
+
 
 def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_buffer, n_iter_patience, args):
     """
@@ -15,7 +49,6 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
 
     Args:
         model (CellBox): an CellBox instance
-        sess (tf.Session): current session, need reinitialization for every nT
         lr_val (float): learning rate (read in from config file)
         l1_lambda (float): l1 regularization weight
         l2_lambda (float): l2 regularization weight
@@ -65,20 +98,7 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
             t0 = time.perf_counter()
             model.train()
             args.optimizer.zero_grad()
-            if args.pert_form == "by u":
-                prediction = model(torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), x_train.to(args.device))
-            elif args.pert_form == "fix x":
-                prediction = model(x_train.T.to(args.device), x_train.to(args.device))
-            convergence_metric, yhat = prediction
-
-            for param in model.named_parameters():
-                if param[0] == "params.W":
-                    param_mat = param[1]
-                    break
-            if args.weight_loss == "expr":
-                loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_train.to(args.device))
-            else:
-                loss_train_i, loss_train_mse_i = args.loss_fn(y_train.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda)
+            convergence_metric, yhat, loss_train_i, loss_train_mse_i = _forward_pass(model, x_train, y_train, args)
             loss_train_i.backward()
             args.optimizer.step()
 
@@ -87,27 +107,7 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                 model.eval()
                 valid_minibatch = iter(args.iter_monitor)
                 x_valid, y_valid = next(valid_minibatch)
-                if args.pert_form == "by u":
-                    prediction = model(
-                        torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
-                        x_valid.to(args.device)
-                    )
-                elif args.pert_form == "fix x":
-                    prediction = model(
-                        x_valid.T.to(args.device),
-                        x_valid.to(args.device)
-                    )
-                    
-                convergence_metric, yhat = prediction
-                for param in model.named_parameters():
-                    if param[0] == "params.W":
-                        param_mat = param[1]
-                        break
-
-                if args.weight_loss == "expr":
-                    loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda, weight=y_valid.to(args.device))
-                else:
-                    loss_valid_i, loss_valid_mse_i = args.loss_fn(y_valid.to(args.device), yhat, param_mat, l1=l1_lambda, l2=l2_lambda)
+                convergence_metric, yhat, loss_valid_i, loss_valid_mse_i = _forward_pass(model, x_valid, y_valid, args)
 
             # Record results to screenshot
             new_loss = best_params.avg_n_iters_loss(loss_valid_i.item())
@@ -117,11 +117,6 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
                     f"\tloss (train):{loss_train_i:1.6f}\tloss (buffer on valid):{new_loss:1.6f}" +
                     f"\tbest:{best_params.loss_min:1.6f}\tTolerance: {n_unchanged}/{n_iter_patience}"
                     )
-                #print(("Substage:{}\tEpoch:{}/{}\tIteration: {}/{}" + "\tloss (train):{:1.6f}\tloss (buffer on valid):"
-                #       "{:1.6f}" + "\tbest:{:1.6f}\tTolerance: {}/{}").format(substage_i, idx_epoch, n_epoch, idx_iter,
-                #                                                              n_iter, loss_train_i, new_loss,
-                #                                                              best_params.loss_min, n_unchanged,
-                #                                                              n_iter_patience))
             
             append_record("record_eval.csv",
                           [idx_epoch, idx_iter, loss_train_i.item(), loss_valid_i.item(), loss_train_mse_i.item(),
@@ -173,43 +168,33 @@ def append_record(filename, contents):
 
 
 def eval_model(args, eval_iter, model, return_value, return_avg=True, n_batches_eval=None):
-    """ Simulate the model for prediction """
-
+    """ 
+    Simulate the model for evaluation.
+    Args:
+        - args (Config): The Config object
+        - eval_iter (DataLoader): The dataloader used for evaluation
+        - model (nn.Module): The perturbation model
+        - return_value (str): The specific variable to return
+        - return_avg (bool): Whether to return an average value
+        - n_batches_eval (int): The number of batches for early stopping
+    Returns:
+        - out (np.array): An array of the variable of interest
+    """
     with torch.no_grad():
         model.eval()
         counter = 0
         eval_results = []
         for item in eval_iter:
             pert, expr = item
-            if args.pert_form == "by u":
-                prediction = model(
-                    torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
-                    pert.to(args.device)
-                )
-            elif args.pert_form == "fix x":
-                prediction = model(
-                    pert.T.to(args.device), 
-                    pert.to(args.device)
-                )
-            _, yhat = prediction
-            for param in model.named_parameters():
-                if param[0] == "params.W":
-                    param_mat = param[1]
-                    break
+            convergence_metric, yhat, loss_full, loss_mse = _forward_pass(model, pert, expr, args)
+
             if return_value == "prediction":
                 eval_results.append(yhat.detach().cpu().numpy())
             elif return_value == "loss_full":
-                if args.weight_loss == "expr":
-                    loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
-                else:
-                    loss_full, _ = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda)
                 eval_results.append(loss_full.detach().cpu().numpy())
             elif return_value == "loss_mse":
-                if args.weight_loss == "expr":
-                    _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=expr.to(args.device))
-                else:
-                    _, loss_mse = args.loss_fn(expr.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda)
                 eval_results.append(loss_mse.detach().cpu().numpy())
+            
             counter += 1
             if n_batches_eval is not None and counter > n_batches_eval:
                 break
@@ -225,7 +210,13 @@ def save_model(model, save_dir):
 
 
 def train_model(model, args):
-    """Train the model"""
+    """
+    Train the model specified by the substages in args. This function loops through the
+    substages and calls train_substage for each substage.
+    Args:
+        - model (nn.Module): The perturbation model
+        - args (Config): The Config model
+    """
     args.logger = TimeLogger(time_logger_step=1, hierachy=2)
     model = model[0].to(args.device)
 
@@ -293,57 +284,26 @@ class Screenshot(dict):
 
         if self.export_verbose > 2:
             try:
-                # Run summary on train set
-                converge_train_mat, converge_eval_mat, converge_test_mat = [], [], []
-                for item in args.iter_train:
-                    pert, _ = item
-                    if args.pert_form == "by u":
-                        prediction = model(
-                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
-                            pert.to(args.device)
-                        )
-                    elif args.pert_form == "fix x":
-                        prediction = model(
-                            pert.T.to(args.device), 
-                            pert.to(args.device)
-                        )
-                    # Shape (length, batch_size)
-                    convergence_metric_train, _ = prediction
-                    converge_train_mat.append(convergence_metric_train.detach().numpy())
+                with torch.no_grad():
+                    model.eval()
+                    # Run summary on train set
+                    converge_train_mat, converge_eval_mat, converge_test_mat = [], [], []
+                    for item in args.iter_train:
+                        pert, expr = item
+                        convergence_metric_train, _, _, _ = _forward_pass(model, pert, expr, args)
+                        converge_train_mat.append(convergence_metric_train.detach().numpy())
 
-                # Run summary on eval set
-                for item in args.iter_monitor:
-                    pert, _ = item
-                    if args.pert_form == "by u":
-                        prediction = model(
-                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
-                            pert.to(args.device)
-                        )
-                    elif args.pert_form == "fix x":
-                        prediction = model(
-                            pert.T.to(args.device), 
-                            pert.to(args.device)
-                        )
-                    # Shape (length, batch_size)
-                    convergence_metric_eval, _ = prediction
-                    converge_eval_mat.append(convergence_metric_eval.detach().numpy())
-                
-                # Run summary on test set
-                for item in args.iter_eval:
-                    pert, _ = item
-                    if args.pert_form == "by u":
-                        prediction = model(
-                            torch.zeros((args.n_x, 1), dtype=torch.float32).to(args.device), 
-                            pert.to(args.device)
-                        )
-                    elif args.pert_form == "fix x":
-                        prediction = model(
-                            pert.T.to(args.device), 
-                            pert.to(args.device)
-                        )
-                    # Shape (length, batch_size)
-                    convergence_metric_test, _ = prediction
-                    converge_test_mat.append(convergence_metric_test.detach().numpy())
+                    # Run summary on eval set
+                    for item in args.iter_monitor:
+                        pert, expr = item
+                        convergence_metric_eval, _, _, _ = _forward_pass(model, pert, expr, args)
+                        converge_eval_mat.append(convergence_metric_eval.detach().numpy())
+                    
+                    # Run summary on test set
+                    for item in args.iter_eval:
+                        pert, expr = item
+                        convergence_metric_test, _, _, _ = _forward_pass(model, pert, expr, args)
+                        converge_test_mat.append(convergence_metric_test.detach().numpy())
 
                 # Concatenate the results:
                 converge_train_mat = np.concatenate(converge_train_mat, axis=1)

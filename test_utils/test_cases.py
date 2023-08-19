@@ -16,7 +16,7 @@ class KernelConfig(object):
         self.gradient_zero_from = None
         #self.__dict__.update(config_dict)
 
-ERROR_TOLERANCE = 0.01
+ODE_ERROR_TOLERANCE = 0.01
 
 
 

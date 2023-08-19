@@ -68,14 +68,14 @@ if __name__ == '__main__':
     working_index = master_args.working_index
     cfg = cellbox.config.Config(master_args.experiment_config_path)
     cfg.ckpt_path_full = os.path.join('./', cfg.ckpt_name)
-    md5 = cellbox.utils.md5(cfg)
+    md5 = cellbox.utils_torch.md5(cfg)
     cfg.drug_index = master_args.drug_index if hasattr(master_args, "drug_index") else None
     cfg.seed = working_index + cfg.seed if hasattr(cfg, "seed") else working_index + 1000
     set_seed(cfg.seed)
     print(vars(cfg))
 
     prepare_workdir(cfg)
-    logger = cellbox.utils.TimeLogger(time_logger_step=1, hierachy=3)
+    logger = cellbox.utils_torch.TimeLogger(time_logger_step=1, hierachy=3)
     args = cfg
     for i, stage in enumerate(cfg.stages):
         set_seed(cfg.seed)

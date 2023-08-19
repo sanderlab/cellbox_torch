@@ -7,15 +7,14 @@ from cellbox.utils_torch import loss, optimize
 
 
 def factory(args):
-    """define model type based on configuration input"""
-    #if args.model == 'CellBox':
-    #    return CellBox(args).build()
-    # Deprecated for now, use scikit-learn instead
-    # TODO: update the co-expression models
-    # if args.model == 'CoExp':
-    #     return CoExp(args).build()
-    # if args.model == 'CoExp_nonlinear':
-    #     return CoExpNonlinear(args).build()
+    """
+    Define model type based on configuration input. Currently supporting only 'CellBox'
+    Args:
+        - args: the Config object
+    Returns:
+        - model: the Pytorch model
+        - args: the updated Config object
+    """
     if args.model == 'CellBox':
         model = CellBox(args)
         args = get_ops(args, model)
@@ -24,48 +23,21 @@ def factory(args):
         model = LinReg(args)
         args = get_ops(args, model)
         return model, args
-    #if args.model == 'NN':
-    #    return NN(args).build()
-    # TODO: baysian model
-    # if args.model == 'Bayesian':
-    #     return BN(args).build()
 
 
 class PertBio(nn.Module):
-    """define abstract perturbation model"""
+    """
+    Define abstract perturbation model. All subsequent models are inherited from this model.
+    """
     def __init__(self, args):
         super().__init__()
         self.args = args
         self.n_x = args.n_x
-        #self.pert_in, self.expr_out = args.pert_in, args.expr_out
         self.iter_train, self.iter_monitor, self.iter_eval = args.iter_train, args.iter_monitor, args.iter_eval
-        #self.train_x, self.train_y = self.iter_train.get_next()
-        #self.monitor_x, self.monitor_y = self.iter_monitor.get_next()
-        #self.eval_x, self.eval_y = self.iter_eval.get_next()
-        self.l1_lambda, self.l2_lambda = self.args.l1_lambda_placeholder, self.args.l2_lambda_placeholder
+        self.l1_lambda, self.l2_lambda = 0.0, 0.0
         self.lr = self.args.lr
         self.params = {}
         self.build()
-
-    #def get_ops(self):
-    #    """get operators for tensorflow"""
-    #    # Do we need this at all for Pytorch?
-    #    pass
-        #if self.args.weight_loss == 'expr':
-        #    self.train_loss, self.train_mse_loss = loss(self.train_y, self.train_yhat, self.params['W'],
-        #                                                self.l1_lambda, self.l2_lambda, weight=self.train_y)
-        #    self.monitor_loss, self.monitor_mse_loss = loss(self.monitor_y, self.monitor_yhat, self.params['W'],
-        #                                                    self.l1_lambda, self.l2_lambda, weight=self.monitor_y)
-        #    self.eval_loss, self.eval_mse_loss = loss(self.eval_y, self.eval_yhat, self.params['W'],
-        #                                              self.l1_lambda, self.l2_lambda, weight=self.eval_y)
-        #elif self.args.weight_loss == 'None':
-        #    self.train_loss, self.train_mse_loss = loss(self.train_y, self.train_yhat, self.params['W'],
-        #                                                self.l1_lambda, self.l2_lambda)
-        #    self.monitor_loss, self.monitor_mse_loss = loss(self.monitor_y, self.monitor_yhat, self.params['W'],
-        #                                                    self.l1_lambda, self.l2_lambda)
-        #    self.eval_loss, self.eval_mse_loss = loss(self.eval_y, self.eval_yhat, self.params['W'],
-        #                                              self.l1_lambda, self.l2_lambda)
-        #self.op_optimize = optimize(self.train_loss, self.lr)
 
     def get_variables(self):
         """get model parameters (overwritten by model configuration)"""
@@ -79,29 +51,16 @@ class PertBio(nn.Module):
         """forward propagation (overwritten by model configuration)"""
         raise NotImplementedError
 
-    #def build(self):
-    #    """build model"""
-    #    # Do we need this at all for Pytorch?
-    #    self.params = {}
-    #    self.get_variables()
-    #    self.train_yhat = self.forward(self.train_y0, self.train_x)
-    #    self.monitor_yhat = self.forward(self.monitor_y0, self.monitor_x)
-    #    self.eval_yhat = self.forward(self.eval_y0, self.train_x)
-    #    self.get_ops()
-    #    return self
-
 
 class CellBox(PertBio):
     def build(self):
         """
-        Get the nn Parameters
+        Initialize the CellBox model
         """
         n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
         self.params = nn.ParameterDict()
 
         W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
-        #with open("/users/ngun7t/Documents/cellbox-jun-6/init_weights.npy", "rb") as f: W = torch.tensor(np.load(f), dtype=torch.float32)
-        #W = nn.Parameter(W, requires_grad=True)
 
         W_mask = self._get_mask()
         self.params['W'] = nn.Parameter(W_mask*W, requires_grad=True)
@@ -115,15 +74,8 @@ class CellBox(PertBio):
             self.params['psi'] = torch.nn.functional.softplus(psi)
 
         if self.args.pert_form == 'by u':
-            #y0 = tf.constant(np.zeros((self.n_x, 1)), name="x_init", dtype=tf.float32)
-            #self.train_y0 = y0
-            #self.monitor_y0 = y0
-            #self.eval_y0 = y0
             self.gradient_zero_from = None
         elif self.args.pert_form == 'fix x':  # fix level of node x (here y) by input perturbation u (here x)
-            #self.train_y0 = tf.transpose(self.train_x)
-            #self.monitor_y0 = tf.transpose(self.monitor_x)
-            #self.eval_y0 = tf.transpose(self.eval_x)
             self.gradient_zero_from = self.args.n_activity_nodes
 
         self.envelope_fn = cellbox.kernel_torch.get_envelope(self.args)
@@ -132,7 +84,8 @@ class CellBox(PertBio):
 
     def _get_mask(self):
         """
-        Get the mask of the tensors
+        Get the mask of the tensors. The mask is applied during the forward pass to disable
+        certain connections in the adjacency matrix.
         """
         W_mask = (1.0 - np.diag(np.ones([self.n_x])))
         W_mask[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
@@ -145,7 +98,7 @@ class CellBox(PertBio):
 
     def forward(self, y0, mu):
         mu_t = torch.transpose(mu, 0, 1)
-        mask = self._get_mask() #self.mask()
+        mask = self._get_mask()
         ys = self.ode_solver(y0, mu_t, self.args.dT, self.args.n_T, self._dxdt, self.gradient_zero_from, mask=mask)
         # [n_T, n_x, batch_size]
         ys = ys[-self.args.ode_last_steps:]
@@ -174,6 +127,9 @@ class LinReg(PertBio):
     
 
 def get_ops(args, model):
+    """
+    Initialize the loss function, optimizer, and device for training the perturbation model
+    """
     args.loss_fn = loss
     args.optimizer = optimize(
         model.parameters(),
