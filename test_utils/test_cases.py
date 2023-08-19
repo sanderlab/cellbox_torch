@@ -1,22 +1,51 @@
 # This contains test cases for each test
+import numpy as np
+import torch
 
-#################################### KERNELS ####################################
+RANDOM_SEED = 42
+np.random.seed(RANDOM_SEED)
+
+#################################### ODE TEST CASES ####################################
 class KernelConfig(object):
-    def __init__(self):
+    def __init__(self, n_x, envelope_form, ode_solver, n_T):
         
-        self.n_x = 99
-        self.envelope_form = "tanh" 
+        self.n_x = n_x
+        self.envelope_form = envelope_form
         self.envelope_fn = None
-        self.polynormial_k = None
+        self.polynormial_k = 2
         self.ode_degree = 1
         self.envelope = 0
-        self.ode_solver = "heun"
+        self.ode_solver = ode_solver
         self.dT = 0.1
-        self.n_T = 200
+        self.ode_last_steps = 2
+        self.n_T = n_T
         self.gradient_zero_from = None
         #self.__dict__.update(config_dict)
 
+N_X = 10
+ODE_PARAMS = {
+    "W": np.random.normal(loc=0.01, size=(N_X, N_X)),
+    "eps": np.ones((N_X, 1), dtype=np.float32),
+    "alpha": np.ones((N_X, 1), dtype=np.float32),
+    "y0_np": np.zeros((N_X, 4)),
+    "mu_t_np": np.random.normal(loc=0.01, size=(4, N_X)).T,
+}
+
 ODE_ERROR_TOLERANCE = 0.01
+ODE_TEST_CASES = [
+    KernelConfig(N_X, "tanh", "heun", 100),
+    KernelConfig(N_X, "tanh", "euler", 100),
+    KernelConfig(N_X, "tanh", "rk4", 100),
+    KernelConfig(N_X, "tanh", "midpoint", 100),
+    KernelConfig(N_X, "clip linear", "heun", 100),
+    KernelConfig(N_X, "clip linear", "euler", 100),
+    KernelConfig(N_X, "clip linear", "rk4", 100),
+    KernelConfig(N_X, "clip linear", "midpoint", 100),
+]
+
+ODE_GROUND_TRUTHS = [
+
+]
 
 
 
