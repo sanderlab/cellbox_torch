@@ -2,6 +2,9 @@
 import numpy as np
 import torch
 import glob
+import pickle
+import pandas as pd
+import os
 
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
@@ -66,6 +69,102 @@ class ODETestCase(object):
         ]
 
 ODE_PARAMETRIZED_TESTS = ODETestCase().parametrized_tests
+
+
+
+#################################### DATALOADER TEST CASES ####################################
+class DataloaderConfig(object):
+    def __init__(self, experiment_type, drug_index):
+        self.experiment_type = experiment_type
+        self.sparse_data = False
+        self.pert_file = "data/pert.csv"
+        self.expr_file = "data/expr.csv"
+        self.node_index_file = "data/node_Index.csv"
+        self.root_dir = ""
+        self.node_index = pd.read_csv(os.path.join(self.root_dir, self.node_index_file), header=None, names=None)
+        self.n_protein_nodes = 82
+        self.n_activity_nodes = 87
+        self.n_x = 99
+        self.trainset_ratio = 0.7
+        self.validset_ratio = 0.8
+        self.batchsize = 4
+        self.add_noise_level = 0
+        self.drug_index = drug_index
+
+        self.l1lambda = 1e-4
+        self.l2lambda = 1e-4
+    
+class DataloaderTestCase(object):
+
+    def __init__(self, seed, exp_type, exp_type_abbrev, drug_index):
+        self.seed = seed
+        self.exp_type = exp_type
+        self.exp_type_abbrev = exp_type_abbrev
+        self.drug_index = drug_index
+        self.cfg = DataloaderConfig(self.exp_type, self.drug_index)
+        with open(f"test_arrays/dataloader/dataloader_{self.exp_type_abbrev}_{self.seed}_{self.drug_index}.pkl", "rb") as f:
+            self.ground_truth = pickle.load(f)
+
+DATALOADER_SEEDS = [940, 671, 601, 323, 259]
+DATALOADER_EXPERIMENT_TYPES = [
+    "random partition", 
+    "leave one out (w/ single)", 
+    "leave one out (w/o single)", 
+    "single to combo", 
+    "random partition with replicates"
+]
+DATALOADER_EXPERIMENT_TYPES_ABBREV = [
+    "RP",
+    "LOO-WS",
+    "LOO-WoS",
+    "S2C",
+    "RPwRep"
+]
+DATALOADER_DRUG_INDICES = [2, 4, 5, 10, 11]
+DATALOADER_PARAMETRIZED_TESTS = []
+for seed, drug in zip(DATALOADER_SEEDS, DATALOADER_DRUG_INDICES):
+    for exp, exp_abbrev in zip(DATALOADER_EXPERIMENT_TYPES, DATALOADER_EXPERIMENT_TYPES_ABBREV):
+        DATALOADER_PARAMETRIZED_TESTS.append(
+            DataloaderTestCase(seed, exp, exp_abbrev, drug)
+        )
+
+
+#################################### UTIL FUNCTIONS TEST CASES ####################################
+
+class LossFunctionTestCase(object):
+
+    def __init__(self, seed, mode, l1, l2, total_loss_tor=0.001, loss_mse_tor=10e-5):
+        self.seed = seed
+        self.mode = mode
+        self.l1 = l1
+        self.l2 = l2
+        self.total_loss_tor = total_loss_tor
+        self.loss_mse_tor = loss_mse_tor
+        with open(f"test_arrays/loss_fn/loss-fn-input_{self.seed}_{self.l1}_{self.l2}_{self.mode}.pkl", "rb") as f:
+            self.inp = pickle.load(f)
+        with open(f"test_arrays/loss_fn/loss-fn-output_{self.seed}_{self.l1}_{self.l2}_{self.mode}.pkl", "rb") as f:
+            self.out = pickle.load(f)
+        
+        self.x_gold = self.inp["x_gold"]
+        self.x_hat = self.inp["x_hat"]
+        self.W = self.inp["W"]
+        self.total_loss = self.out["total_loss"]
+        self.loss_mse = self.out["loss_mse"]
+
+
+        
+
+LOSS_L1 = [2.0, 0.1, 0.01]
+LOSS_L2 = [3.0, 0.5, 0.05]
+LOSS_SEEDS = [52, 16, 79]
+LOSS_MODES = ["expr", "None"]
+LOSS_PARAMETRIZED_TESTS = []
+for mode in LOSS_MODES:
+    for i, seed in enumerate(LOSS_SEEDS):
+        LOSS_PARAMETRIZED_TESTS.append(
+            LossFunctionTestCase(seed, mode, LOSS_L1[i], LOSS_L2[i])
+        )
+        
 
 #a = {
 #  "experiment_id": "Example_RP",
