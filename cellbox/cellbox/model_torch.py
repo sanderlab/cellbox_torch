@@ -60,7 +60,11 @@ class CellBox(PertBio):
         n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
         self.params = nn.ParameterDict()
 
-        W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
+        if self.args.weights and self.args.weights != "None":
+            with open(self.args.weights, "rb") as f:
+                W = torch.tensor(np.load(f), dtype=torch.float32)
+        else:
+            W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
 
         W_mask = self._get_mask()
         self.params['W'] = nn.Parameter(W_mask*W, requires_grad=True)

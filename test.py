@@ -11,11 +11,7 @@ from cellbox.utils_torch import loss
 
 from test_utils.test_cases import KernelConfig, \
     ODETestCase, ODE_PARAMETRIZED_TESTS, DATALOADER_PARAMETRIZED_TESTS, \
-    LOSS_PARAMETRIZED_TESTS
-
-#from test_utils.dataloader import get_dataloader, yield_data_from_tensorflow_dataloader, yield_data_from_pytorch_dataloader, \
-#    s2c_row_inds, loo_row_inds
-
+    LOSS_PARAMETRIZED_TESTS, FEEDFORWARD_PARAMETRIZED_TESTS
 
 #def test_model():
 #    os.system('python scripts/main.py -config=configs/Example.minimal.json')
@@ -109,9 +105,56 @@ def test_loss_fn(loss_test_case):
 #################################################### Tests for model training ####################################################
 
 # Test for the first feedforward pass of the model
+@pytest.mark.parametrize("feedforward_test_case", FEEDFORWARD_PARAMETRIZED_TESTS)
+def test_feedforward(feedforward_test_case):
+    """
+    Test Pytorch's first feedforward
+    """
+    data_in = feedforward_test_case.data_in
+    data_out = feedforward_test_case.data_out
+    torch_args = feedforward_test_case.args
+    torch_cellbox = cellbox.model_torch.factory(torch_args)[0]
+    for w in torch_cellbox.named_parameters():
+        if w[0] == "params.W": w[1].data = torch.tensor(data_in["W"], dtype=torch.float32)
+    l1_lambda = data_in["l1_lambda"]
+    l2_lambda = data_in["l2_lambda"]
+    loss_fn = cellbox.utils_torch.loss
+
+    torch_cellbox.train()
+    if torch_args.pert_form == "by u":
+        prediction = torch_cellbox(
+            torch.zeros((torch_args.n_x, 1), dtype=torch.float32), 
+            torch.tensor(data_in["inp"], dtype=torch.float32)
+        )
+    elif torch_args.pert_form == "fix x":
+        prediction = torch_cellbox(
+            torch.tensor(data_in["inp"].T, dtype=torch.float32),
+            torch.tensor(data_in["inp"], dtype=torch.float32)
+        )
+    convergence_metric, yhat = prediction
+
+    for param in torch_cellbox.named_parameters():
+        if param[0] == "params.W":
+            param_mat = param[1]
+            break
+    loss_train_i_torch, loss_train_mse_i_torch = loss_fn(
+        torch.tensor(data_in["out"], dtype=torch.float32), 
+        yhat,
+        param_mat, 
+        l1=l1_lambda, 
+        l2=l2_lambda)
+
+    # Test if the loss after one feedforward is similar
+    assert abs(loss_train_i_torch.item() - data_out["loss_train"]) <= feedforward_test_case.tolerance["loss_total"]
+    assert abs(loss_train_mse_i_torch.item() - data_out["loss_train_mse"]) <= feedforward_test_case.tolerance["loss_mse"]
+    # Test if the predicted yhat is similar
+    assert \
+        np.all(np.abs(data_out['yhat'] - yhat.detach().cpu().numpy()) < feedforward_test_case.tolerance["yhat"])
+    # Test if the mask on yhat is similar
 
 
 # Test for the predictions and loss values after a long training
+
 
 
 if __name__ == '__main__':

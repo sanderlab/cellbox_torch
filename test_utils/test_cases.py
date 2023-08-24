@@ -151,9 +151,6 @@ class LossFunctionTestCase(object):
         self.total_loss = self.out["total_loss"]
         self.loss_mse = self.out["loss_mse"]
 
-
-        
-
 LOSS_L1 = [2.0, 0.1, 0.01]
 LOSS_L2 = [3.0, 0.5, 0.05]
 LOSS_SEEDS = [52, 16, 79]
@@ -164,7 +161,76 @@ for mode in LOSS_MODES:
         LOSS_PARAMETRIZED_TESTS.append(
             LossFunctionTestCase(seed, mode, LOSS_L1[i], LOSS_L2[i])
         )
-        
+
+
+#################################### FEEDFORWARD TEST CASES ####################################
+
+class ModelConfig(object):
+
+    def __init__(self, model, n_x, envelope_form, ode_solver, n_T, pert_form):
+        self.model = model
+        self.n_x = n_x
+        self.iter_train, self.iter_monitor, self.iter_eval = None, None, None
+        self.lr = 0.1
+        self.n_protein_nodes, self.n_activity_nodes = 82, 87
+        self.pert_form = pert_form
+
+        self.envelope_form = envelope_form
+        self.envelope_fn = None
+        self.polynomial_k = 2
+        self.ode_degree = 1
+        self.envelope = 0
+        self.ode_solver = ode_solver
+        self.dT = 0.1
+        self.ode_last_steps = 2
+        self.n_T = n_T
+        self.gradient_zero_from = None
+
+
+class FeedforwardTestCase(object):
+
+    def __init__(self, args, seed, l1_lambda, l2_lambda, tolerance):
+        self.args = args
+        self.seed = seed
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
+        self.tolerance = tolerance
+
+        with open(f"test_arrays/forward_pass/forward_input_{self.seed}_{self.l1_lambda}_{self.l2_lambda}.pkl", "rb") as f:
+            self.data_in = pickle.load(f)
+        with open(f"test_arrays/forward_pass/forward_out_{self.seed}_{self.l1_lambda}_{self.l2_lambda}.pkl", "rb") as f:
+            self.data_out = pickle.load(f)
+
+
+FEEDFORWARD_TOLERANCE = {
+    "loss_total": 10e-5,
+    "loss_mse": 10e-2,
+    "yhat": 0.1
+}
+FEEDFORWARD_MODEL = "CellBox"
+FEEDFORWARD_NX = 99
+FEEDFORWARD_SEEDS = [7, 87, 62, 45, 23]
+# In form of (l1_lambda, l2_lambda)
+FEEDFORWARD_LAMBDAS = [(2.0, 3.0), (0.1, 0.01), (0.001, 0.0001), (0.01, 0.1), (0.0001, 0.001)]
+# In form of (envelope_fn, ode_solver, "nT", "pert_form")
+FEEDFORWARD_OTHERS = [
+    ("tanh", "heun", 100, "by u"),
+    ("tanh", "euler", 100, "by u"),
+    ("clip linear", "heun", 100, "fix x"),
+    ("tanh", "heun", 100, "fix x"),
+    ("tanh", "midpoint", 100, "fix x")
+]
+FEEDFORWARD_PARAMETRIZED_TESTS = []
+for seed, lamb, other in zip(FEEDFORWARD_SEEDS, FEEDFORWARD_LAMBDAS, FEEDFORWARD_OTHERS):
+    FEEDFORWARD_PARAMETRIZED_TESTS.append(
+        FeedforwardTestCase(
+            ModelConfig(
+                FEEDFORWARD_MODEL, 
+                FEEDFORWARD_NX,
+                other[0], other[1], other[2], other[3]
+            ), seed, lamb[0], lamb[1], FEEDFORWARD_TOLERANCE
+        )
+    )
 
 #a = {
 #  "experiment_id": "Example_RP",

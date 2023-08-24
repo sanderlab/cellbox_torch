@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='CellBox main script')
 parser.add_argument('-config', '--experiment_config_path', required=True, type=str, help="Path of experiment config")
 parser.add_argument('-i', '--working_index', default=0, type=int)
 parser.add_argument('-drug', '--drug_index', required=False, type=int)
+parser.add_argument('-weights', '--weights', required=False, type=str, default=None)
 master_args = parser.parse_args()
 
 
@@ -68,6 +69,7 @@ if __name__ == '__main__':
     working_index = master_args.working_index
     cfg = cellbox.config.Config(master_args.experiment_config_path)
     cfg.ckpt_path_full = os.path.join('./', cfg.ckpt_name)
+    cfg.weights = master_args.weights
     md5 = cellbox.utils_torch.md5(cfg)
     cfg.drug_index = master_args.drug_index if hasattr(master_args, "drug_index") else None
     cfg.seed = working_index + cfg.seed if hasattr(cfg, "seed") else working_index + 1000
