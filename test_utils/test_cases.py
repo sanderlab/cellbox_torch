@@ -31,9 +31,9 @@ class ODETestCase(object):
 
     def __init__(self):
 
-        with open("test_arrays/ODE_W.npy", "rb") as f:
+        with open("test_arrays/ode/ODE_W.npy", "rb") as f:
             W = np.load(f)
-        with open("test_arrays/ODE_mu_t_np.npy", "rb") as f:
+        with open("test_arrays/ode/ODE_mu_t_np.npy", "rb") as f:
             mu_t_np = np.load(f)
 
         self.SEED = 42
@@ -60,7 +60,7 @@ class ODETestCase(object):
 
         self.ODE_GROUND_TRUTHS = []
         for args in self.ODE_TEST_CASES:
-            n = f"test_arrays/ODE_gt_{args.envelope_form}_{args.polynomial_k}_{args.ode_degree}_{args.envelope}_{args.ode_solver}_{args.dT}_{args.ode_last_steps}_{args.n_T}.npy"
+            n = f"test_arrays/ode/ODE_gt_{args.envelope_form}_{args.polynomial_k}_{args.ode_degree}_{args.envelope}_{args.ode_solver}_{args.dT}_{args.ode_last_steps}_{args.n_T}.npy"
             with open(n, "rb") as f:
                 self.ODE_GROUND_TRUTHS.append(np.load(f))
 

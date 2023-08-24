@@ -106,6 +106,7 @@ venv.bak/
 
 # results
 results/
+manuscript/
 manuscript_rep/Figure2/seed_130
 manuscript_rep/Figure2/seed_150
 manuscript_rep/Figure2/seed_871
