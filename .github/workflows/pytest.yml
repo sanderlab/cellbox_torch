@@ -6,11 +6,13 @@ on:
       - master
       - add-pytorch-dataloader-test
       - clean-code
+      - final
   pull_request:
     branches:
       - master
       - add-pytorch-dataloader-test
       - clean-code
+      - final
 
 jobs:
   build:
