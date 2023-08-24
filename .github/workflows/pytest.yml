@@ -33,7 +33,8 @@ jobs:
           pip install pytest ruff # ruff only works with >3.7
           
           # Install CellBox from current repo
-          pip install -e cellbox
+          # pip install -e cellbox
+          python cellbox/setup.py install
           
           # Other dependencies
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
