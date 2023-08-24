@@ -1,4 +1,4 @@
-<a target="_blank" href="https://colab.research.google.com/github/sanderlab/CellBox/blob/master/notebooks/cellbox_example_tf2.ipynb">
+<a target="_blank" href="https://colab.research.google.com/drive/1BadFag4PnxyLFaeu9QZuvQGvYHBfYgEt?usp=sharing">
   <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/>
 </a>
 
