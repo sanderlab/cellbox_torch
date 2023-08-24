@@ -174,6 +174,7 @@ class ModelConfig(object):
         self.lr = 0.1
         self.n_protein_nodes, self.n_activity_nodes = 82, 87
         self.pert_form = pert_form
+        self.weights = "None"
 
         self.envelope_form = envelope_form
         self.envelope_fn = None
