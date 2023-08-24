@@ -93,7 +93,7 @@ These data files are used for generating the results from the official CellBox p
 * A `dataset_torch.factory()` function for random parition, leave-one-out, and single-to-combo tasks (refer to the original CellBox paper for more information).
 * A multiple-substage training process for finding the optimal hyperparameters defined in `train_torch.py`. 
 
-## One click model construction
+## Model construction and training
 
 ### __Step 1: Create experiment json files (some examples can be found under ./configs/)__
 * Make sure to specify the experiment_id and experiment_type
@@ -136,6 +136,13 @@ python scripts/main.py -config=configs/Example.leave_one_drug_out.json -i=1234 -
 	* `record_eval.csv`: log file with loss changes and time used.
 	* `random_pos.csv` (only for random partitions): the data splits for training, validation, and testing. For example, train-val-test splits are 50-30-20, then the first 50% of rows in `random_pos.csv` files correspond to indices in the training set, the next 30% and 20% of rows correspond to validation and test sets.
 	* `best.W`, `best.alpha`, `best.eps`: model parameters snapshot for each training stage.
-	* `best.y_hat`: Prediction on test set, using the best model for each stage.
+	* `best.y_hat`: Prediction on test set, using the best model for each stage. The loss value in the file name denotes the total loss (MSE + L1 loss + L2 loss) with that prediction. The rows of the file correspond to the test indices in `random_pos.csv` if random partitioning, or the left out drug in other experiment tasks.
 	* `.pth` files are the final models in pytorch compatible format.
 	* `best.summary`: Prediction on train, val, and test sets, using the best model for each stage.
+	
+	
+# Technical discussions
+
+## Unit tests for future development
+
+Along with a new CellBox-pytorch implementation, this repo also contains unit tests for future verification efforts, implemented in `test_torch.py`, `/test_utils` and `/test_arrays`. Especially, `/test_arrays` include data obtained from the original CellBox and serve as a ground truth for further testing and development.
