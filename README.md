@@ -16,31 +16,21 @@ Systematic perturbation of cells followed by comprehensive measurements of molec
 
 ## Citation and Correspondence
 
-This is CellBox scripts developed in Sander lab for the paper in _[Cell Systems](https://www.cell.com/cell-systems/pdfExtended/S2405-4712(20)30464-6)_ or [bioRxiv](https://www.biorxiv.org/content/10.1101/746842v3).
+This CellBox pytorch implementation is based on the original CellBox scripts developed in Sander lab for the paper in _[Cell Systems](https://www.cell.com/cell-systems/pdfExtended/S2405-4712(20)30464-6)_ or [bioRxiv](https://www.biorxiv.org/content/10.1101/746842v3) maintained by Bo Yuan, Judy Shen, and Augustin Luna.
 
 >Yuan, B.*, Shen, C.*, Luna, A., Korkut, A., Marks, D., Ingraham, J., Sander, C. CellBox: Interpretable Machine Learning for Perturbation Biology with Application to the Design of Cancer Combination Therapy. _Cell Systems_, 2020. 
 
-Maintained by Bo Yuan, Judy Shen, and Augustin Luna.
+This specific pytorch implementation is maintained by Phuc Nguyen, Augustin Luna, and Bo Yuan.
 
 If you want to discuss the usage or to report a bug, please use the 'Issues' function here on GitHub.
 
 If you find `CellBox` useful for your research, please consider citing the corresponding publication.
 
-For more information, please find our contact information [here](https://www.sanderlab.org/#/).
+For more information, please find our contact information [here](https://www.sanderlab.org/#/). 
 
-# Quick Start
+# Quick Start with Colab
 
-Easily try `CellBox` online with Google Colab 
-
-1. Go to: https://mybinder.org/v2/gh/sanderlab/CellBox/9d13f3354f8b14bd896de6c8aa5db0b97c65ad12
-2. From the New dropdown, click Terminal 
-3. Run the following command for a short example of model training process: 
-
-```
-python scripts/main.py -config=configs/Example.random_partition.json
-```
-
-Alternatively, in project folder, do the same command
+Easily try `CellBox pytorch` online with Google Colab. Go to https://colab.research.google.com/drive/1BadFag4PnxyLFaeu9QZuvQGvYHBfYgEt?usp=sharing and run the notebook.
 
 # Installation
 
@@ -55,27 +45,6 @@ cd /<folder_name>/cellbox
 pip install .
 ```
 
-If you only want to install CellBox from a particular branch, the following command will install cellbox from a particular branch using the '@' notation:
-
-```
-pip install git+https://github.com/sanderlab/CellBox.git@cell_systems_final#egg=cellbox\&subdirectory=cellbox
-```
-
-## Install using setup.py (setup.py install has been deprecated in newer Python versions)
-Clone repository and in the `cellbox` folder run:
-
-```
-python3.6 setup.py install
-```
-
-Only python3.6 supported. Anaconda or pipenv is recommended to create python environment. 
-
-Now you can test if the installation is successful
-
-```
-import cellbox
-cellbox.VERSION
-```
 
 # Project Structure
 
