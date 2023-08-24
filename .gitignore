@@ -105,6 +105,7 @@ venv.bak/
 .mypy_cache/
 
 # results
+binder/
 results/
 manuscript/
 manuscript_rep/Figure2/seed_130
