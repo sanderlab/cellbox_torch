@@ -117,7 +117,7 @@ notebooks/
 logs/
 
 # misc
-requirements_old.txt
+requirements_copy.txt
 init_weights.npy
 sample_output.npy
 sample_input.npy
