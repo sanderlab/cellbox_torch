@@ -34,7 +34,10 @@ jobs:
           
           # Install CellBox from current repo
           # pip install -e cellbox
-          python cellbox/setup.py install
+          # python cellbox/setup.py install
+          cd cellbox
+          pip install .
+          cd ../
           
           # Other dependencies
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
