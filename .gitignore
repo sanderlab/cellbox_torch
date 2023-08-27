@@ -105,9 +105,25 @@ venv.bak/
 .mypy_cache/
 
 # results
+binder/
 results/
+manuscript/
+manuscript_rep/Figure2/seed_130
+manuscript_rep/Figure2/seed_150
+manuscript_rep/Figure2/seed_871
+manuscript_rep/Figure2/random_partition_average_pytorch_490.csv
 configs/*/grid_search
 configs_dev/
+bash_scripts/
+notebooks/
+logs/
+
+# misc
+requirements_copy.txt
+init_weights.npy
+sample_output.npy
+sample_input.npy
+test_torch.py
 
 # Pycharm
 .idea

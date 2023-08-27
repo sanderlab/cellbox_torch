@@ -1,86 +1,124 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import cellbox.kernel
-from cellbox.utils import loss, optimize
+import cellbox.kernel_torch
+
+from cellbox.utils_torch import loss, optimize
 
 
 def factory(args):
-    """define model type based on configuration input"""
+    """
+    Define model type based on configuration input. Currently supporting only 'CellBox'
+    Args:
+        - args: the Config object
+    Returns:
+        - model: the Pytorch model
+        - args: the updated Config object
+    """
     if args.model == 'CellBox':
-        return CellBox(args).build()
-    # Deprecated for now, use scikit-learn instead
-    # TODO: update the co-expression models
-    # if args.model == 'CoExp':
-    #     return CoExp(args).build()
-    # if args.model == 'CoExp_nonlinear':
-    #     return CoExpNonlinear(args).build()
-    #if args.model == 'LinReg':
-    #    return LinReg(args).build()
-    #if args.model == 'NN':
-    #    return NN(args).build()
-    # TODO: baysian model
-    # if args.model == 'Bayesian':
-    #     return BN(args).build()
+        model = CellBox(args)
+        args = get_ops(args, model)
+        return model, args
+    if args.model == 'LinReg':
+        model = LinReg(args)
+        args = get_ops(args, model)
+        return model, args
 
 
 class PertBio(nn.Module):
-    """define abstract perturbation model"""
+    """
+    Define abstract perturbation model. All subsequent models are inherited from this model.
+    """
     def __init__(self, args):
         super().__init__()
         self.args = args
         self.n_x = args.n_x
-        self.pert_in, self.expr_out = args.pert_in, args.expr_out
         self.iter_train, self.iter_monitor, self.iter_eval = args.iter_train, args.iter_monitor, args.iter_eval
-        #self.train_x, self.train_y = self.iter_train.get_next()
-        #self.monitor_x, self.monitor_y = self.iter_monitor.get_next()
-        #self.eval_x, self.eval_y = self.iter_eval.get_next()
-        self.l1_lambda, self.l2_lambda = self.args.l1_lambda_placeholder, self.args.l2_lambda_placeholder
+        self.l1_lambda, self.l2_lambda = 0.0, 0.0
         self.lr = self.args.lr
-
-    def get_ops(self):
-        """get operators for tensorflow"""
-        if self.args.weight_loss == 'expr':
-            self.train_loss, self.train_mse_loss = loss(self.train_y, self.train_yhat, self.params['W'],
-                                                        self.l1_lambda, self.l2_lambda, weight=self.train_y)
-            self.monitor_loss, self.monitor_mse_loss = loss(self.monitor_y, self.monitor_yhat, self.params['W'],
-                                                            self.l1_lambda, self.l2_lambda, weight=self.monitor_y)
-            self.eval_loss, self.eval_mse_loss = loss(self.eval_y, self.eval_yhat, self.params['W'],
-                                                      self.l1_lambda, self.l2_lambda, weight=self.eval_y)
-        elif self.args.weight_loss == 'None':
-            self.train_loss, self.train_mse_loss = loss(self.train_y, self.train_yhat, self.params['W'],
-                                                        self.l1_lambda, self.l2_lambda)
-            self.monitor_loss, self.monitor_mse_loss = loss(self.monitor_y, self.monitor_yhat, self.params['W'],
-                                                            self.l1_lambda, self.l2_lambda)
-            self.eval_loss, self.eval_mse_loss = loss(self.eval_y, self.eval_yhat, self.params['W'],
-                                                      self.l1_lambda, self.l2_lambda)
-        self.op_optimize = optimize(self.train_loss, self.lr)
+        self.params = {}
+        self.build()
 
     def get_variables(self):
         """get model parameters (overwritten by model configuration)"""
         raise NotImplementedError
 
+    def build(self):
+        """get model parameters (overwritten by model configuration)"""
+        raise NotImplementedError
+    
     def forward(self, x, mu):
         """forward propagation (overwritten by model configuration)"""
         raise NotImplementedError
 
+
+class CellBox(PertBio):
     def build(self):
-        """build model"""
-        self.params = {}
-        self.get_variables()
-        self.train_yhat = self.forward(self.train_y0, self.train_x)
-        self.monitor_yhat = self.forward(self.monitor_y0, self.monitor_x)
-        self.eval_yhat = self.forward(self.eval_y0, self.train_x)
-        self.get_ops()
-        return self
+        """
+        Initialize the CellBox model
+        """
+        n_x, n_protein_nodes, n_activity_nodes = self.n_x, self.args.n_protein_nodes, self.args.n_activity_nodes
+        self.params = nn.ParameterDict()
+
+        if self.args.weights and self.args.weights != "None":
+            with open(self.args.weights, "rb") as f:
+                W = torch.tensor(np.load(f), dtype=torch.float32)
+        else:
+            W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
+
+        W_mask = self._get_mask()
+        self.params['W'] = nn.Parameter(W_mask*W, requires_grad=True)
+        eps = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
+        alpha = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
+        self.params['alpha'] = nn.functional.softplus(alpha)
+        self.params['eps'] = nn.functional.softplus(eps)
+
+        if self.args.envelope == 2:
+            psi = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
+            self.params['psi'] = torch.nn.functional.softplus(psi)
+
+        if self.args.pert_form == 'by u':
+            self.gradient_zero_from = None
+        elif self.args.pert_form == 'fix x':  # fix level of node x (here y) by input perturbation u (here x)
+            self.gradient_zero_from = self.args.n_activity_nodes
+
+        self.envelope_fn = cellbox.kernel_torch.get_envelope(self.args)
+        self.ode_solver = cellbox.kernel_torch.get_ode_solver(self.args)
+        self._dxdt = cellbox.kernel_torch.get_dxdt(self.args, self.params)
+
+    def _get_mask(self):
+        """
+        Get the mask of the tensors. The mask is applied during the forward pass to disable
+        certain connections in the adjacency matrix.
+        """
+        W_mask = (1.0 - np.diag(np.ones([self.n_x])))
+        W_mask[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
+        W_mask[:, self.args.n_protein_nodes:self.args.n_activity_nodes] = np.zeros([self.n_x, self.args.n_activity_nodes - self.args.n_protein_nodes])
+        W_mask[self.args.n_protein_nodes:self.args.n_activity_nodes, self.args.n_activity_nodes:] = np.zeros([self.args.n_activity_nodes - self.args.n_protein_nodes,
+                                                                                self.n_x - self.args.n_activity_nodes])
+        #final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
+        #self.params['W'] = self.params["W"] * (torch.tensor(W_mask, dtype=torch.float32))
+        return torch.tensor(W_mask, dtype=torch.float32)
+
+    def forward(self, y0, mu):
+        mu_t = torch.transpose(mu, 0, 1)
+        mask = self._get_mask()
+        ys = self.ode_solver(y0, mu_t, self.args.dT, self.args.n_T, self._dxdt, self.gradient_zero_from, mask=mask)
+        # [n_T, n_x, batch_size]
+        ys = ys[-self.args.ode_last_steps:]
+        # [n_iter_tail, n_x, batch_size]
+        #self.mask()
+        mean = torch.mean(ys, dim=0)
+        sd = torch.std(ys, dim=0)
+        yhat = torch.transpose(ys[-1], 0, 1)
+        dxdt = self._dxdt(ys[-1], mu_t)
+        # [n_x, batch_size] for last ODE step
+        convergence_metric = torch.cat([mean, sd, dxdt], dim=0)
+        return convergence_metric, yhat
     
 
 class LinReg(PertBio):
     """linear regression model"""
-    def __init__(self):
-        super().__init__()
-        self.get_variables()
-
     def get_variables(self):
         self.W = nn.Linear(
             in_features=self.n_x,
@@ -90,3 +128,16 @@ class LinReg(PertBio):
 
     def forward(self, x, mu):
         return self.W(mu)
+    
+
+def get_ops(args, model):
+    """
+    Initialize the loss function, optimizer, and device for training the perturbation model
+    """
+    args.loss_fn = loss
+    args.optimizer = optimize(
+        model.parameters(),
+        lr=args.lr
+    )
+    args.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    return args

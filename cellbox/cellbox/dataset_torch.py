@@ -18,17 +18,24 @@ from scipy import sparse
 
 
 def factory(cfg):
-    """formulate training dataset"""
+    """
+    Prepare dataloaders for training CellBox. These variables will be initiated and added to cfg:
+        - cfg.pert (np.array or pd.DataFrame): The perturbation matrix or the input to CellBox
+        - cfg.expr (np.array or pd.DataFrame): The expression matrix
+        - cfg.dataset (dict): A dictionary containing the raw train, val, and test matrix splits
+        - cfg.iter_train (torch DataLoader): Dataloader for the training set
+        - cfg.iter_val (torch DataLoader): Dataloader for the validation set
+        - cfg.iter_test (torch DataLoader): Dataloader for the testing set
+    
+    Args:
+        - cfg: the Config object
+    """
     # Prepare data
     # To replace cfg.pert_in and cfg.expr_out, should it take the full pert and expr datasets?
     if cfg.sparse_data:
-        #cfg.pert_in = tf.compat.v1.sparse.placeholder(tf.float32, [None, cfg.n_x], name='pert_in')
-        #cfg.expr_out = tf.compat.v1.sparse.placeholder(tf.float32, [None, cfg.n_x], name='expr_out')
         cfg.pert = sparse.load_npz(os.path.join(cfg.root_dir, cfg.pert_file))
         cfg.expr = sparse.load_npz(os.path.join(cfg.root_dir, cfg.expr_file))
     else:
-        #cfg.pert_in = tf.compat.v1.placeholder(tf.float32, [None, cfg.n_x], name='pert_in')
-        #cfg.expr_out = tf.compat.v1.placeholder(tf.float32, [None, cfg.n_x], name='expr_out')
         cfg.pert = pd.read_csv(os.path.join(cfg.root_dir, cfg.pert_file), header=None, dtype=np.float32)
         cfg.expr = pd.read_csv(os.path.join(cfg.root_dir, cfg.expr_file), header=None, dtype=np.float32)
     
@@ -60,21 +67,6 @@ def factory(cfg):
     elif cfg.experiment_type == 'random partition with replicates':
         cfg.dataset = random_partition_with_replicates(cfg)
 
-    # Prepare feed_dicts
-    #cfg.feed_dicts = {
-    #    'train_set': {
-    #        cfg.pert_in: cfg.dataset['pert_train'],
-    #        cfg.expr_out: cfg.dataset['expr_train'],
-    #    },
-    #    'valid_set': {
-    #        cfg.pert_in: cfg.dataset['pert_valid'],
-    #        cfg.expr_out: cfg.dataset['expr_valid'],
-    #    },
-    #    'test_set': {
-    #        cfg.pert_in: cfg.dataset['pert_test'],
-    #        cfg.expr_out: cfg.dataset['expr_test']
-    #    }
-    #}
     cfg = get_tensors(cfg)
 
     return cfg
@@ -87,21 +79,11 @@ def pad_and_realign(x, length, idx_shift=0):
 
 
 def get_tensors(cfg):
-    # prepare training placeholders
-    #cfg.l1_lambda_placeholder = tf.compat.v1.placeholder(tf.float32, name='l1_lambda')
-    #cfg.l2_lambda_placeholder = tf.compat.v1.placeholder(tf.float32, name='l2_lambda')
-    #cfg.lr = tf.compat.v1.placeholder(tf.float32, name='lr')
-    cfg.l1_lambda_placeholder = 0.0
-    cfg.l2_lambda_placeholder = 0.0
+    """
+    Update the train, val, and test dataloaders in cfg
+    """
     cfg.lr = 0.0
 
-    # Prepare dataset iterators (these can be replaced with DataLoader)
-    #dataset = tf.data.Dataset.from_tensor_slices((cfg.pert_in, cfg.expr_out))
-    #cfg.iter_train = tf.compat.v1.data.make_initializable_iterator(
-    #    dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=True).batch(cfg.batchsize))
-    #cfg.iter_monitor = tf.compat.v1.data.make_initializable_iterator(
-    #    dataset.repeat().shuffle(buffer_size=1024, reshuffle_each_iteration=True).batch(cfg.batchsize))
-    #cfg.iter_eval = tf.compat.v1.data.make_initializable_iterator(dataset.batch(cfg.batchsize))
     train_dataset = TensorDataset(
         torch.from_numpy(cfg.dataset["pert_train"]), torch.from_numpy(cfg.dataset["expr_train"])
     )
@@ -112,6 +94,7 @@ def get_tensors(cfg):
         torch.from_numpy(cfg.dataset["pert_test"]), torch.from_numpy(cfg.dataset["expr_test"])
     )
 
+    # Prepare dataset iterators (these can be replaced with DataLoader)
     cfg.iter_train = DataLoader(
         train_dataset, batch_size=cfg.batchsize, shuffle=True
     )
@@ -119,7 +102,7 @@ def get_tensors(cfg):
         val_dataset, batch_size=cfg.batchsize, shuffle=True
     )
     cfg.iter_eval = DataLoader(
-        test_dataset, batch_size=cfg.batchsize, shuffle=True
+        test_dataset, batch_size=cfg.batchsize, shuffle=False
     )
 
     return cfg
