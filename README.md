@@ -35,7 +35,7 @@ Easily try `CellBox pytorch` online with Google Colab. Go to https://colab.resea
 # Installation
 
 ## Install using pip 
-Before installing CellBox-pytorch, it is good practice to create a Python virtual environment. With conda, `conda create -n “cellbox” python==3.8.0` creates a conda environment with the name `cellbox` and Python 3.8.0. Activate the environment by `conda activate cellbox`. 
+Before installing CellBox-pytorch, it is good practice to create a Python virtual environment. With conda, `conda create -n cellbox python==3.8.0` creates a conda environment with the name `cellbox` and Python 3.8.0. Activate the environment by `conda activate cellbox`. 
 
 To install CellBox-pytorch to a particular folder, type the following:
 
