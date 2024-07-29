@@ -78,7 +78,7 @@ def heun_solver(x, t_mu, dT, n_T, _dXdt, n_activity_nodes=None, mask=None):
     dxdt_mask = nn.functional.pad(
         torch.ones((n_activity_nodes, 1)), 
         (0, 0, 0, n_x - n_activity_nodes)
-    )
+    ).to(x.device)
     for _ in range(n_T):
         dxdt_current = _dXdt(x, t_mu, mask)
         dxdt_next = _dXdt(x + dT * dxdt_current, t_mu, mask)
@@ -97,7 +97,7 @@ def euler_solver(x, t_mu, dT, n_T, _dXdt, n_activity_nodes=None, mask=None):
     dxdt_mask = nn.functional.pad(
         torch.ones((n_activity_nodes, 1)), 
         (0, 0, 0, n_x - n_activity_nodes)
-    )
+    ).to(x.device)
     for _ in range(n_T):
         dxdt_current = _dXdt(x, t_mu, mask)
         x = x + dT * dxdt_current * dxdt_mask
@@ -115,7 +115,7 @@ def midpoint_solver(x, t_mu, dT, n_T, _dXdt, n_activity_nodes=None, mask=None):
     dxdt_mask = nn.functional.pad(
         torch.ones((n_activity_nodes, 1)), 
         (0, 0, 0, n_x - n_activity_nodes)
-    )
+    ).to(x.device)
     for _ in range(n_T):
         dxdt_current = _dXdt(x, t_mu, mask)
         dxdt_midpoint = _dXdt(x + 0.5 * dT * dxdt_current, t_mu, mask)
@@ -134,7 +134,7 @@ def rk4_solver(x, t_mu, dT, n_T, _dXdt, n_activity_nodes=None, mask=None):
     dxdt_mask = nn.functional.pad(
         torch.ones((n_activity_nodes, 1)), 
         (0, 0, 0, n_x - n_activity_nodes)
-    )
+    ).to(x.device)
     for _ in range(n_T):
         k1 = _dXdt(x, t_mu, mask)
         k2 = _dXdt(x + 0.5*dT*k1, t_mu, mask)
