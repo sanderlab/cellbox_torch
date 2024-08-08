@@ -146,6 +146,7 @@ def train_substage(model, lr_val, l1_lambda, l2_lambda, n_epoch, n_iter, n_iter_
 
     # Evaluation on test set
     t0 = time.perf_counter()
+    print(f"args.iter_eval, {args.iter_eval}")
     loss_test_mse = eval_model(
         args, args.iter_eval, model, return_value="loss_mse", n_batches_eval=args.n_batches_eval
     )
