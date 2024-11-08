@@ -119,7 +119,7 @@ class CellBox(PertBio):
 
 class LinReg(PertBio):
     """linear regression model"""
-    def get_variables(self):
+    def build(self):
         self.W = nn.Linear(
             in_features=self.n_x,
             out_features=self.n_x,
@@ -127,7 +127,11 @@ class LinReg(PertBio):
         )
 
     def forward(self, x, mu):
-        return self.W(mu)
+        ys = self.W(mu)
+        mean = torch.mean(ys, dim=0)
+        sd = torch.std(ys, dim=0)
+        convergence_metric = torch.cat([mean, sd], dim=0)
+        return convergence_metric, ys
     
 
 def get_ops(args, model):
