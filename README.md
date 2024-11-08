@@ -84,17 +84,17 @@ For example:
 * Running CellBox with random partition:
 
 ```
-python scripts/main.py -config=configs/Example.random_partition.json
+python scripts/main_torch.py -config=configs/Example.random_partition.json
 ```
 * Setting a specific seed:
 
 ```
-python scripts/main.py -config=configs/Example.random_partition.json -i=1234
+python scripts/main_torch.py -config=configs/Example.random_partition.json -i=1234
 ```
 
 * Setting a specific drug index for leave-one-out experiments:
 ```
-python scripts/main.py -config=configs/Example.leave_one_drug_out.json -i=1234 -drug 5
+python scripts/main_torch.py -config=configs/Example.leave_one_drug_out.json -i=1234 -drug 5
 ```
 
 
