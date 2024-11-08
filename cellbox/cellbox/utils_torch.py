@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import json
 
-def loss(x_gold, x_hat, W, l1=0, l2=0, weight=1.):
+def loss(x_gold, x_hat, W=None, l1=0, l2=0, weight=1.):
     """
     Evaluate loss
 
@@ -22,8 +22,11 @@ def loss(x_gold, x_hat, W, l1=0, l2=0, weight=1.):
     #if isinstance(x_gold, tf.SparseTensor):
     #    x_gold = tf.sparse.to_dense(x_gold)
     loss_mse = torch.mean(torch.square(x_gold - x_hat)*abs(weight))
-    l1_loss = l1 * torch.sum(torch.abs(W))
-    l2_loss = l2 * torch.sum(torch.square(torch.abs(W)))
+    if W is None:
+        l1_loss, l2_loss = 0., 0.
+    else:
+        l1_loss = l1 * torch.sum(torch.abs(W))
+        l2_loss = l2 * torch.sum(torch.square(torch.abs(W)))
     loss_full = loss_mse + l1_loss + l2_loss
     return loss_full, loss_mse
 
