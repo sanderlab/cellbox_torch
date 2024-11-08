@@ -33,6 +33,8 @@ def _forward_pass(model, x, y, args):
         if param[0] == "params.W":
             param_mat = param[1]
             break
+        else:
+            param_mat = None
 
     if args.weight_loss == "expr":
         loss_total, loss_mse = args.loss_fn(y.to(args.device), yhat, param_mat, l1=args.l1_lambda, l2=args.l2_lambda, weight=y.to(args.device))
