@@ -1,0 +1,15 @@
+{
+    "prot_data_file": "data.csv",
+    "prot_info_file": "prots_info.csv",
+    "last_prot_index": -12,
+    "first_prot_index": 1,
+    "metadata_cols": ["pert_id", "Cell_viability%_(cck8Drug-blk)/(control-blk)*100", "Main Target UniProtID"],
+    "id_key": "Uniprot.ID",
+    "nan_thres": 0.05,
+    "target_col": "Cell_viability%_(cck8Drug-blk)/(control-blk)*100",
+    "file_prefix": "westlake_",
+    "file_path": "cellbox_files/",
+    "intensity_upper": 2,
+    "intensity_lower": -4,
+    "dispersion_lower": 95
+}
