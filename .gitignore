@@ -127,3 +127,6 @@ test_torch.py
 
 # Pycharm
 .idea
+
+#large files
+/Abdullah_kuziez/online_data/
