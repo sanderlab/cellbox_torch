@@ -45,6 +45,6 @@
         {"lr_val": 0.001,"l1lambda": 0.0001}
     ]}],
 
-    "export_verbose": 3,
+    "export_verbose": 1,
     "ckpt_name": "model11.pth"
 }
