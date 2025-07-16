@@ -17,7 +17,9 @@ parser.add_argument('-i', '--working_index', default=0, type=int)
 parser.add_argument('-drug', '--drug_index', required=False, type=int)
 parser.add_argument('-weights', '--weights', required=False, type=str, default=None)
 master_args = parser.parse_args()
-
+print('master_args')
+print(master_args)
+print('bye')
 
 def set_seed(in_seed):
     """Sets random seeds for numpy and tensorflow."""

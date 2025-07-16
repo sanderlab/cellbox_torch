@@ -279,7 +279,7 @@ class Screenshot(dict):
                     new_params[item] = pd.DataFrame(params[item].detach().numpy())
             self.update(new_params)
 
-        if self.export_verbose > 1 or self.export_verbose == -1:  # no params but y_hat
+        if self.export_verbose > 0 or self.export_verbose == -1:  # no params but y_hat
             y_hat = eval_model(args, args.iter_eval, model, return_value="prediction", return_avg=False)
             y_hat = pd.DataFrame(y_hat, columns=node_index[0])
             self.update({'y_hat': y_hat})

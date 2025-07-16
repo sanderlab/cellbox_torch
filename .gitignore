@@ -130,3 +130,5 @@ test_torch.py
 
 #large files
 /Abdullah_kuziez/online_data/
+/Abdullah_kuziez/Experiments/run_logs/
+

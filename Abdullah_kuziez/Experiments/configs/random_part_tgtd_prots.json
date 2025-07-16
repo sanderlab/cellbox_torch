@@ -1,0 +1,50 @@
+{
+  "experiment_id": "RP_tgtd_prots_______",
+  "experiment_type": "random partition",
+  "model": "CellBox",
+  "sparse_data": false,
+  "pert_file": "Abdullah_kuziez/Experiments/cellbox_files/tgtd_prots&trials_only/run1directly_targeted_proteinspert.csv",
+  "expr_file": "Abdullah_kuziez/Experiments/cellbox_files/tgtd_prots&trials_only/run1directly_targeted_proteinsexpr.csv",
+  "node_index_file": "Abdullah_kuziez/Experiments/cellbox_files/tgtd_prots&trials_only/run1directly_targeted_proteinsnode_Index.csv",
+  "n_protein_nodes": 61,
+  "n_activity_nodes": 62,
+  "n_x" : 123,
+  "trainset_ratio": 0.7,
+  "validset_ratio": 0.8,
+  "batchsize": 4,
+  "add_noise_level": 0,
+
+  "envelop_form": "tanh",
+  "dT": 0.1,
+  "envelop":0,
+  "ode_degree": 1,
+  "ode_solver": "heun",
+  "ode_last_steps": 2,
+  "l1lambda": 1e-4,
+  "l2lambda": 1e-4,
+
+  "n_epoch": 10000,
+  "n_iter": 10000,
+  "n_iter_buffer":50,
+  "n_iter_patience":100,
+
+  "stages":[{
+    "nT": 100,
+    "sub_stages":[
+        {"lr_val": 0.1,"l1lambda": 0.01, "n_iter_patience":1000},
+        {"lr_val": 0.01,"l1lambda": 0.01},
+        {"lr_val": 0.01,"l1lambda": 0.0001},
+        {"lr_val": 0.001,"l1lambda": 0.00001}
+    ]},{
+    "nT": 200,
+    "sub_stages":[
+        {"lr_val": 0.001,"l1lambda": 0.0001}
+    ]},{
+    "nT": 400,
+    "sub_stages":[
+        {"lr_val": 0.001,"l1lambda": 0.0001}
+    ]}],
+
+    "export_verbose": 3,
+    "ckpt_name": "model_tgtd_prots.pth"
+}
