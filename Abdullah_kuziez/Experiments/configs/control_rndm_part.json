@@ -1,5 +1,5 @@
 {
-  "experiment_id": "control_melanoma__MAE_LOSS_",
+  "experiment_id": "control_melanoma__",
   "experiment_type": "random partition",
   "model": "CellBox",
   "sparse_data": false,

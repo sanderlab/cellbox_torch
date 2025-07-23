@@ -21,8 +21,8 @@ def loss(x_gold, x_hat, W=None, l1=0, l2=0, weight=1.):
     """
     #if isinstance(x_gold, tf.SparseTensor):
     #    x_gold = tf.sparse.to_dense(x_gold)
-   # loss_mse = torch.mean(torch.square(x_gold - x_hat)*abs(weight)) #temporarily deactivated to swap loss
-    loss_mse = torch.mean(torch.abs(x_gold - x_hat) * abs(weight)) #MAE loss 
+    loss_mse = torch.mean(torch.square(x_gold - x_hat)*abs(weight)) #temporarily deactivated to swap loss
+    # loss_mse = torch.mean(torch.abs(x_gold - x_hat) * abs(weight)) #MAE loss 
     if W is None:
         l1_loss, l2_loss = 0., 0.
     else:
