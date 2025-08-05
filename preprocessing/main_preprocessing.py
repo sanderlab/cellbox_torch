@@ -362,13 +362,14 @@ if __name__ == '__main__':
     prot_log, pert_id_to_targets = get_log_ratios(prot_data, main_targets_retained, prots_retained, prot_tar, cfg.target_col, cfg.id_key)
     acti_df = get_activity_nodes(prot_log, pert_id_to_targets)
     expr_csv, pert_csv, node_index_csv = make_cellbox_files(prot_log, acti_df, cfg.file_prefix, cfg.file_path)
+   
     inds_final = signal_to_noise_filter(expr_csv)
     prots_total, prots_tar = variability_intensity_filter(expr_csv, prot_tar, prot_info, cfg.intensity_upper, cfg.intensity_lower, cfg.dispersion_lower)
 
     total_proteins = list(set(prots_total).intersection(set(inds_final)).union(set(prots_tar)))
     cell_viab_acti_cols = [a for a in expr_csv.columns.tolist() if a.startswith("a")] + ["Cell_viability%_(cck8Drug-blk)/(control-blk)*100"]
     all_cols = total_proteins + cell_viab_acti_cols
-    pdb.set_trace()
+    # pdb.set_trace()
     expr_csv_sub = expr_csv[all_cols].astype(float)
     pert_csv_sub = pert_csv[all_cols].astype(float)
 
