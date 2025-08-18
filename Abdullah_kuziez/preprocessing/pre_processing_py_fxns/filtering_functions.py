@@ -614,7 +614,6 @@ def filter_proteins_with_control(data_by_cell_line, cell_lines, control_data_by_
             print(f"[{cell}] {len(data_prots)} prots -> {non_meta_prots} prots")
 
         if graph_flag or verbose:
-        if graph_flag or verbose:
             graphing_dict_before[cell] = pd.Series(
             [1 if prot in control_prots_intersect else 0 for prot in data_by_cell_line[cell].columns],
             index=data_by_cell_line[cell].columns
@@ -646,17 +645,6 @@ def filter_proteins_with_control(data_by_cell_line, cell_lines, control_data_by_
             graph_type=graph_type,
             **kwargs
         )
-
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
-
-def filter_incomplete_proteins(data_by_cell_line, cell_lines, completeness_threshold_prot=0.8, **kwargs):
 
     if verbose:
         return {
@@ -747,16 +735,7 @@ def filter_incomplete_proteins(data_by_cell_line, cell_lines, completeness_thres
         }
     return filtered_data, step_dict
 
-def filter_incomplete_experiments(data_by_cell_line, cell_lines, completeness_threshold_experiment=0.8, **kwargs):
-    
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
+
 
 def filter_incomplete_experiments(data_by_cell_line, cell_lines, completeness_threshold_experiment=0.8, **kwargs):
     filtered_data,graphing_dict_before,graphing_dict_after={},{},{}
@@ -838,18 +817,10 @@ def filter_incomplete_experiments(data_by_cell_line, cell_lines, completeness_th
         }
     return filtered_data, step_dict
     
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
 
 
 #high variance filters
-def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_line, **kwargs):
+
 def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_line, **kwargs):
     graphing_dict_before,graphing_dict_after,filtered_data = {},{},{}
     print_flag=kwargs.pop('print_flag',False)
@@ -861,7 +832,7 @@ def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_l
     if not filter_flag:
         print('filtering low coefficient of variation proteins is disabled')
         return data_by_cell_line, None
-        return data_by_cell_line, None
+
 
     print('filtering low coefficient of variation proteins')
     
@@ -899,7 +870,6 @@ def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_l
             print(f"[{cell}] {original_num_proteins} -> {non_meta_prots} prots")
             print(f"[{cell}] {original_num_proteins} -> {non_meta_prots} prots")
 
-        if graph_flag or verbose:
         if graph_flag or verbose:
             # Get a pandas Series of the numeric coefficient of variation values before filtering
             col_set_1=data_by_cell_line[cell].select_dtypes(include=[float, int]).columns.intersection(set(numeric_coeff_var.columns))
@@ -941,15 +911,7 @@ def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_l
             'step_dict': step_dict
         }
     return filtered_data, step_dict
-    
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
+
 
 def remove_outlier_proteins(data_by_cell_line, cell_lines, outlier_factor=10, **kwargs):
     """
@@ -970,12 +932,6 @@ def remove_outlier_proteins(data_by_cell_line, cell_lines, outlier_factor=10, **
         return data_by_cell_line, None
 
     print('removing outlier proteins')
-    
-    # Initialize step dictionary
-    step_dict = {'step_name': 'outlier', 'protein_counts': {}}
-
-    threshold_holder=[]
-    for i,cell_line in enumerate(cell_lines):
     
     # Initialize step dictionary
     step_dict = {'step_name': 'outlier', 'protein_counts': {}}
@@ -1057,20 +1013,9 @@ def remove_outlier_proteins(data_by_cell_line, cell_lines, outlier_factor=10, **
         }
     return filtered_data, step_dict
     
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            #THIS LINE IS INCLUDED BECAUSE THE THRESHOLD IS CALCULATED INTERNALLY
-            'threshold':threshold_holder,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
 
 
 #log transforming:
-def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cell_line, **kwargs):
 def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cell_line, **kwargs):
     """
     Log2 transform each protein column in data_by_cell_line by dividing by the corresponding control value,
@@ -1116,14 +1061,8 @@ def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cel
         control_vals['meta_Inhi_05'] = 100
         control_vals['meta_Inhi_50'] = 100
         control_vals['meta_Inhi_200'] = 100
-        control_vals['meta_Inhi_5'] = 100
-        control_vals['meta_Inhi_05'] = 100
-        control_vals['meta_Inhi_50'] = 100
-        control_vals['meta_Inhi_200'] = 100
         
         # Only transform columns that are present in both data and control, and are numeric
-        protein_cols = list(set(df.select_dtypes(include='number').columns).intersection(set(control_vals.columns)))
-        #log transforming
         protein_cols = list(set(df.select_dtypes(include='number').columns).intersection(set(control_vals.columns)))
         #log transforming
         for col in protein_cols:
@@ -1172,52 +1111,13 @@ def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cel
             'step_dict': step_dict
         }
     return log2_transformed,
-        log2_transformed[cell] = df
-        # Count only non-meta proteins for the step dictionary
-        non_meta_prots = len([col for col in df.columns if not col.startswith('meta_')])
-        step_dict['protein_counts'][cell] = non_meta_prots
 
-        if graph_flag or verbose:
-            graphing_dict_before[cell] = data_by_cell_line[cell][protein_cols].copy()
-            graphing_dict_after[cell] = log2_transformed[cell][protein_cols].copy()
-
-        if print_flag:
-            print(f"[{cell}] Log2 transformed {len(protein_cols)} protein columns")
     
 
-    if graph_flag:
-        # Plot before and after transformation if requested
-        plot_grid_graphs(
-            graphing_dict_before, 
-            cell_lines, 
-            title_func=lambda cell: f'{cell} - Before Log2 Transform',
-            xlabel_func=lambda: 'Raw Expression Values',
-            graph_type=graph_type,
-            **kwargs
-        )
-        plot_grid_graphs(
-            graphing_dict_after, 
-            cell_lines, 
-            title_func=lambda cell: f'{cell} - After Log2 Transform', 
-            xlabel_func=lambda: 'Log2 Transformed Values',
-            graph_type=graph_type,
-            **kwargs
-        )
-        
-    if print_flag:
-        print('\n\n')
-    if verbose:
-        return {
-            'filtered_data': log2_transformed,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return log2_transformed,
 
 
 #complex filters
-def filter_by_mutual_information(data_by_cell_line,cell_lines, mi_thresh=0.01,y_col=None,rand_state=42, **kwargs):
+
 def filter_by_mutual_information(data_by_cell_line,cell_lines, mi_thresh=0.01,y_col=None,rand_state=42, **kwargs):
     filter_flag=kwargs.pop('filter_flag',True)
     if not filter_flag:
@@ -1271,7 +1171,6 @@ def filter_by_mutual_information(data_by_cell_line,cell_lines, mi_thresh=0.01,y_
             print(f"[{cell}] {raw_data.shape[1]} -> {len(keep_cols)} prots")
 
         if graph_flag or verbose:
-        if graph_flag or verbose:
             graphing_dict_before[cell] = mi_series
             graphing_dict_after[cell] = mi_series[keep_cols]
 
@@ -1304,18 +1203,6 @@ def filter_by_mutual_information(data_by_cell_line,cell_lines, mi_thresh=0.01,y_
         }
     return filtered_data, step_dict
 
-def iterative_signal_filtering(data_by_cell_line,cell_lines, std_threshold=2.5, tole=0.001, filtering_to_use=1, **kwargs):
-    if print_flag:
-        print('\n\n')
-    
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
 
 def iterative_signal_filtering(data_by_cell_line,cell_lines, std_threshold=2.5, tole=0.001, filtering_to_use=1, **kwargs):
     #logic of the code: assume we are dealing with gaussian noise initially, and then if there are things that stand out from the noise, we pluck them out
@@ -1331,10 +1218,6 @@ def iterative_signal_filtering(data_by_cell_line,cell_lines, std_threshold=2.5, 
     verbose=kwargs.pop('verbose',True)
     if not filter_flag:
         print('filtering by iterative signal filtering is disabled')
-        return data_by_cell_line, None
-    
-    # Initialize step dictionary
-    step_dict = {'step_name': 'iter_signal', 'protein_counts': {}}
         return data_by_cell_line, None
     
     # Initialize step dictionary
@@ -1427,21 +1310,10 @@ def iterative_signal_filtering(data_by_cell_line,cell_lines, std_threshold=2.5, 
         }
     return filtered_data, step_dict
 
-    if print_flag:
-        print('\n\n')
-    
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
+
 
 
 #spearman and pearson filtering
-def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
 def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
     from scipy.stats import spearmanr
     filtered_data,graphing_dict_before,graphing_dict_after={},{},{}
@@ -1505,7 +1377,6 @@ def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol=
             print(f"[{cell}] {cell_data.shape[1]} -> {len(keep_cols)} prots")
 
         if graph_flag or verbose:
-        if graph_flag or verbose:
             graphing_dict_before[cell] = correlations_series
             graphing_dict_after[cell] = correlations_series[keep_cols]
 
@@ -1538,18 +1409,7 @@ def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol=
         }
     return filtered_data, step_dict
 
-def pearson_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
-    if print_flag:
-        print('\n\n')
-    
-    if verbose:
-        return {
-            'filtered_data': filtered_data,
-            'graphing_dict_before': graphing_dict_before,
-            'graphing_dict_after': graphing_dict_after,
-            'step_dict': step_dict
-        }
-    return filtered_data, step_dict
+
 
 def pearson_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
     from scipy.stats import pearsonr
@@ -1613,7 +1473,6 @@ def pearson_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='
             print(f"[{cell}] {cell_data.shape[1]} -> {len(keep_cols)} prots")
             print(f"[{cell}] {cell_data.shape[1]} -> {len(keep_cols)} prots")
 
-        if graph_flag or verbose:
         if graph_flag or verbose:
             graphing_dict_before[cell] = correlations_series
             graphing_dict_after[cell] = correlations_series[keep_cols]
