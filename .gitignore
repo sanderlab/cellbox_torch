@@ -133,4 +133,7 @@ test_torch.py
 /Abdullah_kuziez/online_data/
 /Abdullah_kuziez/Experiments/run_logs/
 /Abdullah_kuziez/Experiments/raw_data/TNBC_set/
-Abdullah_kuziez/preprocessing/TNBC_notebooks/filtering_results/
+/Abdullah_kuziez/preprocessing/TNBC_notebooks/filtering_results/
+
+#specific files named
+Abdullah_kuziez/preprocessing/TNBC_notebooks/filtering_results/6hr_nontgt_479f4a_pipeline.pkl
