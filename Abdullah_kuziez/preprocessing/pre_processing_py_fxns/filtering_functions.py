@@ -8,10 +8,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.model_selection import train_test_split
-from .graphing_fxns import step_dicts_to_summary_df
-from .graphing_fxns import plot_grid_graphs
-from .graphing_fxns import print_summary_df
-from .graphing_fxns import plot_filtering_progress_from_df
 import copy
 from sklearn.model_selection import LeaveOneOut
 import numpy as np
@@ -735,8 +731,6 @@ def filter_incomplete_proteins(data_by_cell_line, cell_lines, completeness_thres
         }
     return filtered_data, step_dict
 
-
-
 def filter_incomplete_experiments(data_by_cell_line, cell_lines, completeness_threshold_experiment=0.8, **kwargs):
     filtered_data,graphing_dict_before,graphing_dict_after={},{},{}
     print_flag=kwargs.pop('print_flag',False)
@@ -817,8 +811,6 @@ def filter_incomplete_experiments(data_by_cell_line, cell_lines, completeness_th
         }
     return filtered_data, step_dict
     
-
-
 #high variance filters
 
 def filter_keep_low_cv(data_by_cell_line, cell_lines, max_cv, coeffvar_by_cell_line, **kwargs):
@@ -1014,7 +1006,6 @@ def remove_outlier_proteins(data_by_cell_line, cell_lines, outlier_factor=10, **
     return filtered_data, step_dict
     
 
-
 #log transforming:
 def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cell_line, **kwargs):
     """
@@ -1113,9 +1104,6 @@ def log2_transform_by_control(data_by_cell_line, cell_lines, control_data_by_cel
     return log2_transformed,
 
     
-
-
-
 #complex filters
 
 def filter_by_mutual_information(data_by_cell_line,cell_lines, mi_thresh=0.01,y_col=None,rand_state=42, **kwargs):
@@ -1310,9 +1298,6 @@ def iterative_signal_filtering(data_by_cell_line,cell_lines, std_threshold=2.5, 
         }
     return filtered_data, step_dict
 
-
-
-
 #spearman and pearson filtering
 def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
     from scipy.stats import spearmanr
@@ -1408,8 +1393,6 @@ def spearman_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol=
             'step_dict': step_dict
         }
     return filtered_data, step_dict
-
-
 
 def pearson_corr_filtering(data_by_cell_line, cell_lines, threshold=0.01, ycol='meta_Inhi_5', **kwargs):
     from scipy.stats import pearsonr
@@ -1583,21 +1566,8 @@ def overlapping_features(top_100_features_list,n_prots_to_keep=100):
     top_100=protein_fold_matrix.index.tolist()[:n_prots_to_keep]
     return(top_100,protein_fold_matrix)
 
-
 #LOO regression:
-
-def loo_regression_per_cell_line(
-    data_by_cell_line,
-    cell_lines,
-    ycol,
-    model,
-    print_stats=True,
-    plot_results=True,
-    meta_regex='meta_',
-    show_progress=True,
-    hash_value='None',
-    **kwargs
-):
+def loo_regression_per_cell_line(data_by_cell_line,cell_lines,ycol,model,print_stats=True,plot_results=True,meta_regex='meta_',show_progress=True,hash_value='None',**kwargs):
     """
     Perform Leave-One-Out regression for each cell line using the specified model.
 

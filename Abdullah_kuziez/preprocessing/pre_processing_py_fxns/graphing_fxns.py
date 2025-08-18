@@ -1,14 +1,13 @@
+import math
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
-import pandas as pd
-import pandas as pd
+from sklearn.base import clone
 from sklearn.metrics import r2_score, mean_squared_error
 from sklearn.model_selection import LeaveOneOut
-import numpy as np
+from tabulate import tabulate
 from tqdm import tqdm
-from sklearn.base import clone
-from tqdm import tqdm
-from sklearn.base import clone
 
 def plot_grid_graphs(data_dict,cell_lines,title_func,xlabel_func,graph_type='CDF',**kwargs):
     #setting up options for plots
@@ -95,9 +94,6 @@ def plot_grid_graphs(data_dict,cell_lines,title_func,xlabel_func,graph_type='CDF
     return
 
 
-
-
-
 def plot_data_value_distribution(final_filtered_non_tgt_prots, cell_lines, **kwargs):
     """
     Plots histograms of data values for each cell line after filtering.
@@ -152,8 +148,6 @@ def filterAbyfilterB(filterfxnA,filteredfxnB,data_by_cell_line,cell_lines,kwargs
 
 
     # Arrange scatter plots for each cell line into subplots and add threshold lines
-    import math
-
     n_cells = len(cell_lines)
     n_cols = kwargs.get('n_cols', 3)
     n_rows = kwargs.get('n_rows', math.ceil(n_cells / n_cols))
@@ -193,7 +187,6 @@ def filterAbyfilterB(filterfxnA,filteredfxnB,data_by_cell_line,cell_lines,kwargs
     return
     
 
-
 def plot_protein_correlation_heatmaps(data_by_cell_line, cell_lines=None, figsize_per_subplot=(6, 5), cmap='coolwarm', vmin=-1, vmax=1, **kwargs):
     """
     Plots a heatmap of protein-protein correlations for each cell line.
@@ -211,9 +204,6 @@ def plot_protein_correlation_heatmaps(data_by_cell_line, cell_lines=None, figsiz
         Min and max values for the colormap.
     - **kwargs: passed to seaborn.heatmap
     """
-    import math
-    import matplotlib.pyplot as plt
-    import seaborn as sns
 
     if cell_lines is None:
         cell_lines = list(data_by_cell_line.keys())
@@ -240,9 +230,6 @@ def plot_protein_correlation_heatmaps(data_by_cell_line, cell_lines=None, figsiz
     plt.show()
     return
 
-
-#plotting fxns
-import pandas as pd
 
 def step_dicts_to_summary_df(*step_dicts):
     """
@@ -324,7 +311,7 @@ def plot_filtering_progress_from_df(df, **kwargs):
     step_names = list(df.index)
     
     # Set up colors and markers
-    import matplotlib.pyplot as plt
+
     if config['colors'] is None:
         prop_cycle = plt.rcParams['axes.prop_cycle']
         colors = prop_cycle.by_key()['color']
@@ -361,7 +348,6 @@ def plot_filtering_progress_from_df(df, **kwargs):
 
     # INSERT_YOUR_CODE
 
-from tabulate import tabulate
 def print_summary_df(summary_df, cell_lines=None):
     print(tabulate(summary_df, headers='keys', tablefmt='grid'))
     return 
@@ -401,8 +387,6 @@ def filterAbyfilterB(filterfxnA,filteredfxnB,data_by_cell_line,cell_lines,kwargs
 
 
     # Arrange scatter plots for each cell line into subplots and add threshold lines
-    import math
-
     n_cells = len(cell_lines)
     n_cols = kwargs.get('n_cols', 3)
     n_rows = kwargs.get('n_rows', math.ceil(n_cells / n_cols))
@@ -460,9 +444,8 @@ def plot_protein_correlation_heatmaps(data_by_cell_line, cell_lines=None, figsiz
         Min and max values for the colormap.
     - **kwargs: passed to seaborn.heatmap
     """
-    import math
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+
+
 
     if cell_lines is None:
         cell_lines = list(data_by_cell_line.keys())
@@ -491,7 +474,6 @@ def plot_protein_correlation_heatmaps(data_by_cell_line, cell_lines=None, figsiz
 
 
 #plotting fxns
-import pandas as pd
 
 def step_dicts_to_summary_df(*step_dicts):
     """
@@ -573,7 +555,7 @@ def plot_filtering_progress_from_df(df, **kwargs):
     step_names = list(df.index)
     
     # Set up colors and markers
-    import matplotlib.pyplot as plt
+
     if config['colors'] is None:
         prop_cycle = plt.rcParams['axes.prop_cycle']
         colors = prop_cycle.by_key()['color']
@@ -610,7 +592,6 @@ def plot_filtering_progress_from_df(df, **kwargs):
 
     # INSERT_YOUR_CODE
 
-from tabulate import tabulate
 def print_summary_df(summary_df, cell_lines=None):
     print(tabulate(summary_df, headers='keys', tablefmt='grid'))
     return 
