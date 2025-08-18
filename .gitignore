@@ -24,6 +24,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.pkl
 MANIFEST
 
 # PyInstaller
@@ -131,4 +132,5 @@ test_torch.py
 #large files
 /Abdullah_kuziez/online_data/
 /Abdullah_kuziez/Experiments/run_logs/
-/Abdullah_kuziez/raw_data/TNBC_set/
+/Abdullah_kuziez/Experiments/raw_data/TNBC_set/
+Abdullah_kuziez/preprocessing/TNBC_notebooks/filtering_results/
