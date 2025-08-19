@@ -1,94 +1,96 @@
 import pandas as pd
 import numpy as np
 import re
+import os
 
-def make_activity_nodes(targeted_proteins_with_metadata,pert_id_to_targets_dict):
-    activity_nodes=targeted_proteins_with_metadata.copy()
-    #scan through each protein column
-    for protein in targeted_proteins_with_metadata.columns:
 
-        #scan through each row and get the pert_id, then look it up in the dictionary to see if the protein is targeted;
-        for index, row in targeted_proteins_with_metadata.iterrows():
-
-            pert_id=row['pert_id']
-
-            #check if the pert_id is in the pert_ID_list
-            if pert_id in pert_id_to_targets_dict.keys():
-                #check if the protein is in the dictionary
-                if protein in pert_id_to_targets_dict[pert_id]:
-                    pass
-                else:
-                    if protein in activity_nodes.columns:
-                        activity_nodes.loc[index,protein]=0
-
-    #cleave off last 12 columns for metadata:
-    activity_nodes=activity_nodes.iloc[:,:]
-    return activity_nodes
-
-def get_targeted_indices(targeted_proteins_with_metadata):
-    protein_list=targeted_proteins_with_metadata.columns
-    targeted_indices = []
-    #first check that it is proteins:
-    for index, Uniprots in enumerate(targeted_proteins_with_metadata['Uniprot.ID']):
-        if Uniprots is not np.nan:
-            if 'not' not in str(Uniprots).lower():
-                id_list=[]
-                id_list.extend([t.strip().upper() for t in re.split(r'[;,]', Uniprots)])
-                #then check that the protein is in the list of targeted proteins:
-                for i in id_list:
-                    if i in protein_list:
-                        targeted_indices.append(index)
-                        break
-    return targeted_indices
-
-def make_cellbox_files(prot_log, acti_df, file_prefix, file_path):
-    #cellbox takes in three files: expr.csv, pert.csv, node_Index.csv
-#expr.csv is the expression data, of size drug trials x(proteins+phenotypes+activity nodes)
-#pert.csv is the perturbation data, of size drug trials x(proteins+phenotypes+activity nodes); the proteins and phenotypes are zeroed out
-#the activity nodes indicate the activity of each protein in each drug trial, and so therefore should be of size #of targeted proteins, 
-#these are activated.
-
-    """
-    Creates CellBox input files from processed data.
+#rewriting the make cellbox files:
+def make_cellbox_files2(non_tgt_prots,phenotype_columns,tgt_prots,drug_pert_id_targets_dict,save_path,file_prefix=""):
     
-    Args:
-        prot_log: DataFrame containing log ratios
-        acti_df: DataFrame containing activity nodes
-        file_prefix: Prefix for output files
-        file_path: Path to save output files
-    
-    Returns: cellbox_files
-    """
+    #step 0 organizing the proteins into the final format:
+    meta_cols=[col for col in non_tgt_prots.columns if col.startswith('meta_')]
+    len_meta=len(meta_cols)
 
-    expr_csv = prot_log.merge(acti_df, left_index=True, right_index=True)
+    cleaned_non_tgt=non_tgt_prots.drop(columns=meta_cols)
 
-    # Create perturbation data
-    zeros_pert = pd.DataFrame(np.zeros_like(prot_log), columns=prot_log.columns, index=prot_log.index)
-    acti_df_arctanh = pd.DataFrame(
-        np.arctanh(acti_df.to_numpy().astype(float)),
-        columns=acti_df.columns, index=acti_df.index
+    phenotype_cols=tgt_prots[phenotype_columns]
+    phenotype_cols = phenotype_cols.rename(columns=lambda col: col[5:] if col.startswith('meta_') else col)
+
+    overall_with_meta=pd.concat([cleaned_non_tgt,phenotype_cols,tgt_prots],axis=1)
+    overall_without_meta=overall_with_meta.drop(columns=meta_cols)
+
+    #step 1 make the index (without meta_cols)
+    node_index_csv=make_node_index_csv(overall_without_meta)
+    #step 2 make the expr csv:
+    pert_csv,all_tgt_prots=make_pert_csv(overall_with_meta,drug_pert_id_targets_dict)
+    #step 3 make the pert csv:
+    expr_csv=make_expr_csv(overall_with_meta,pert_csv,all_tgt_prots)
+
+
+
+    #step 4 drop all the meta_cols
+    expr_csv=expr_csv.drop(columns=meta_cols)
+    pert_csv=pert_csv.drop(columns=meta_cols)
+
+    #step 5 write to files
+    os.makedirs(os.path.join(save_path, file_prefix), exist_ok=True)
+    node_index_csv.to_csv(
+        os.path.join(save_path, file_prefix, file_prefix + 'node_Index.csv'),
+        header=False,
+        index=False
     )
-    pert_csv = pd.merge(zeros_pert, acti_df_arctanh, left_index=True, right_index=True)
-
-    # Create node index
-    columns = pert_csv.columns.tolist()
-    node_index_csv = pd.DataFrame({"A": columns})
-
-    # Save files
     expr_csv.to_csv(
-        (file_path + file_prefix + "expr.csv"),
+        os.path.join(save_path, file_prefix, file_prefix + "expr.csv"),
         header=False,
         index=False
     )
     pert_csv.to_csv(
-        (file_path + file_prefix + "pert.csv"),
+        os.path.join(save_path, file_prefix, file_prefix + "pert.csv"),
         header=False,
         index=False
     )
-    node_index_csv.to_csv(
-        (file_path + file_prefix + "node_Index.csv"),
-        sep=" ",
-        header=False,
-        index=False
-    )
-    return expr_csv, pert_csv, node_index_csv
+
+    return expr_csv,pert_csv,node_index_csv
+
+
+def make_pert_csv(overall_with_meta,pert_id_to_targets_dict):
+    activity_nodes=overall_with_meta.copy()
+    all_tgt_prots=[]
+    for idx,row in activity_nodes.iterrows():
+        #there is a large bug here wher I can't get into the dict because of type mismatch
+        pert_id=row.loc['meta_pert_id']
+        pert_id = int(str(pert_id).replace('#', '').strip())
+
+        if pert_id in pert_id_to_targets_dict.keys():
+
+            #get the targeted proteins and check which ones are in the column names of tgt_prots_plus_meta
+            targeted_proteins=pert_id_to_targets_dict[pert_id]
+            
+            #get the intersection of targeted_proteins and col names
+            intersection_of_prots=list(set(targeted_proteins).intersection(set(activity_nodes.columns)))
+            opposite_cols=list(set(activity_nodes.columns).difference(set(intersection_of_prots)))
+            activity_nodes.loc[idx,opposite_cols]=0
+            all_tgt_prots.extend(intersection_of_prots)
+            
+
+
+    # take the arctanh of activity nodes (i.e., all_tgt_prots columns)
+    all_tgt_prots=list(set(all_tgt_prots))
+    import numpy as np
+    if all_tgt_prots:
+        activity_nodes.loc[:, all_tgt_prots] = np.arctanh(activity_nodes.loc[:, all_tgt_prots].astype(float))
+        x=1
+    return activity_nodes,all_tgt_prots
+
+def make_expr_csv(all_prots_plus_meta,pert_csv,all_tgt_prots):
+    
+    new_expr=all_prots_plus_meta.copy()
+    new_expr.loc[:,all_tgt_prots] = pert_csv.loc[:,all_tgt_prots]
+    return new_expr
+
+def make_node_index_csv(prots_with_metadata):
+    node_index=[col for col in prots_with_metadata.columns if not col.startswith('meta_')]
+    node_index_csv=pd.DataFrame(node_index,columns=['node_index'])
+    return node_index_csv
+
+
