@@ -8,7 +8,7 @@
   "node_index_file": "Abdullah_kuziez/Experiments/TNBC_cellbox_files/HS578T_6hr/HS578T_6hrnode_Index.csv",
   "n_protein_nodes": 110,
   "n_activity_nodes": 111,
-  "n_x" : 123,
+  "n_x" : 122,
   "trainset_ratio": 0.7,
   "validset_ratio": 0.8,
   "batchsize": 4,
