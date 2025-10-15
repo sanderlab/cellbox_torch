@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import pandas as pd
 import torch
 import torch.nn as nn
 import cellbox.kernel_torch
@@ -61,12 +63,57 @@ class CellBox(PertBio):
         self.params = nn.ParameterDict()
 
         if self.args.weights and self.args.weights != "None":
-            with open(self.args.weights, "rb") as f:
-                W = torch.tensor(np.load(f), dtype=torch.float32)
+            weights_path = self.args.weights
+            ext = os.path.splitext(weights_path)[1].lower()
+            if ext in [".npy", ".npz"]:
+                loaded = np.load(weights_path, allow_pickle=False)
+                if isinstance(loaded, np.lib.npyio.NpzFile):
+                    # Use the first array if multiple are present
+                    keys = list(loaded.keys())
+                    if len(keys) == 0:
+                        raise ValueError(f"Weights file '{weights_path}' contains no arrays")
+                    W_np = loaded[keys[0]]
+                else:
+                    W_np = loaded
+            elif ext in [".csv", ".tsv", ".txt"]:
+                sep = "," if ext == ".csv" else None
+                W_np = pd.read_csv(weights_path, header=None, sep=sep).values
+            else:
+                raise ValueError(f"Unsupported weights file extension '{ext}'. Use .npy/.npz or .csv")
+
+            if W_np.shape != (n_x, n_x):
+                raise ValueError(
+                    f"Weights matrix shape {W_np.shape} does not match expected (n_x, n_x)=({n_x}, {n_x}). "
+                    f"Check that the file contains a full {n_x}x{n_x} adjacency in the correct node order."
+                )
+
+            W = torch.tensor(W_np, dtype=torch.float32)
         else:
             W = torch.normal(mean=0.01, std=1.0, size=(n_x, n_x), dtype=torch.float32)
 
-        W_mask = self._get_mask()
+        # Build mask for parameter initialization, optionally combining with a user-provided mask
+        extra_mask_init = None
+        if hasattr(self.args, 'extra_mask') and getattr(self.args, 'extra_mask') is not None:
+            extra_mask_init = getattr(self.args, 'extra_mask')
+        elif hasattr(self.args, 'extra_mask_path') and getattr(self.args, 'extra_mask_path') not in [None, "None", ""]:
+            mask_path = getattr(self.args, 'extra_mask_path')
+            ext = os.path.splitext(mask_path)[1].lower()
+            if ext in [".npy", ".npz"]:
+                loaded_m = np.load(mask_path, allow_pickle=False)
+                if isinstance(loaded_m, np.lib.npyio.NpzFile):
+                    keys = list(loaded_m.keys())
+                    if len(keys) == 0:
+                        raise ValueError(f"Mask file '{mask_path}' contains no arrays")
+                    extra_mask_init = loaded_m[keys[0]]
+                else:
+                    extra_mask_init = loaded_m
+            elif ext in [".csv", ".tsv", ".txt"]:
+                sep = "," if ext == ".csv" else None
+                extra_mask_init = pd.read_csv(mask_path, header=None, sep=sep).values
+            else:
+                raise ValueError(f"Unsupported mask file extension '{ext}'. Use .npy/.npz or .csv")
+
+        W_mask = self._get_mask(extra_mask_init)
         self.params['W'] = nn.Parameter(W_mask*W, requires_grad=True)
         eps = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
         alpha = nn.Parameter(torch.ones((n_x, 1), dtype=torch.float32), requires_grad=True)
@@ -86,19 +133,36 @@ class CellBox(PertBio):
         self.ode_solver = cellbox.kernel_torch.get_ode_solver(self.args)
         self._dxdt = cellbox.kernel_torch.get_dxdt(self.args, self.params)
 
-    def _get_mask(self):
+    def _get_mask(self, extra_mask=None):
         """
-        Get the mask of the tensors. The mask is applied during the forward pass to disable
-        certain connections in the adjacency matrix.
+        Get the adjacency mask. Optionally combine with an external mask such that a connection
+        is enabled only if allowed by BOTH masks (logical AND via elementwise multiply).
+
+        Args:
+            - extra_mask: optional mask to combine with the base mask. Can be a torch.Tensor or
+                          numpy.ndarray of shape (n_x, n_x). Non-zero values are treated as 1.
         """
-        W_mask = (1.0 - np.diag(np.ones([self.n_x])))
-        W_mask[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
-        W_mask[:, self.args.n_protein_nodes:self.args.n_activity_nodes] = np.zeros([self.n_x, self.args.n_activity_nodes - self.args.n_protein_nodes])
-        W_mask[self.args.n_protein_nodes:self.args.n_activity_nodes, self.args.n_activity_nodes:] = np.zeros([self.args.n_activity_nodes - self.args.n_protein_nodes,
+        W_mask_np = (1.0 - np.diag(np.ones([self.n_x])))
+        W_mask_np[self.args.n_activity_nodes:, :] = np.zeros([self.n_x - self.args.n_activity_nodes, self.n_x])
+        W_mask_np[:, self.args.n_protein_nodes:self.args.n_activity_nodes] = np.zeros([self.n_x, self.args.n_activity_nodes - self.args.n_protein_nodes])
+        W_mask_np[self.args.n_protein_nodes:self.args.n_activity_nodes, self.args.n_activity_nodes:] = np.zeros([self.args.n_activity_nodes - self.args.n_protein_nodes,
                                                                                 self.n_x - self.args.n_activity_nodes])
-        #final_W = (torch.from_numpy(W_mask)*W).type(torch.float32)
-        #self.params['W'] = self.params["W"] * (torch.tensor(W_mask, dtype=torch.float32))
-        return torch.tensor(W_mask, dtype=torch.float32)
+
+        W_mask = torch.tensor(W_mask_np, dtype=torch.float32)
+
+        if extra_mask is not None:
+            if isinstance(extra_mask, np.ndarray):
+                extra = torch.tensor((extra_mask != 0).astype(np.float32), dtype=torch.float32)
+            elif torch.is_tensor(extra_mask):
+                extra = extra_mask.detach().to(dtype=torch.float32)
+                extra = (extra != 0).to(dtype=torch.float32)
+            else:
+                raise TypeError("extra_mask must be a numpy.ndarray or torch.Tensor")
+            if extra.shape != (self.n_x, self.n_x):
+                raise ValueError(f"extra_mask shape {tuple(extra.shape)} must match (n_x, n_x)=({self.n_x}, {self.n_x})")
+            W_mask = W_mask * extra
+
+        return W_mask
 
     def forward(self, y0, mu):
         mu_t = torch.transpose(mu, 0, 1)
